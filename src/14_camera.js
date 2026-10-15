@@ -36,6 +36,19 @@ const Cam = {
     out.pos.copy(base).addScaledVector(this.dir, -dist).add(new V3(0, height, 0));
     const gh = World.groundHeight(out.pos.x, out.pos.z) + 1.3;
     if (out.pos.y < gh) out.pos.y = gh;
+    // keep the camera out of tree canopies: pull in toward the rider before the first one
+    World.queryColliders((base.x + out.pos.x) / 2, (base.z + out.pos.z) / 2, dist * 0.6 + 4, this._cc || (this._cc = []));
+    let tMin = 1;
+    for (const c of this._cc) {
+      if (c.kind !== 'tree') continue;
+      const R = c.r * 2.6 + 0.4;
+      for (let k = 2; k <= 10; k++) {
+        const t = k / 10;
+        const x = lerp(base.x, out.pos.x, t), z = lerp(base.z, out.pos.z, t);
+        if ((x - c.x) ** 2 + (z - c.z) ** 2 < R * R && lerp(base.y, out.pos.y, t) < c.top) { tMin = Math.min(tMin, t - 0.1); break; }
+      }
+    }
+    if (tMin < 1) out.pos.lerpVectors(base, out.pos, Math.max(0.35, tMin)).add(new V3(0, (1 - tMin) * 1.2, 0));
     const mid = new V3().lerpVectors(base, out.pos, 0.5);
     const mh = World.groundHeight(mid.x, mid.z) + 1.0;
     if (mid.y < mh) out.pos.y += (mh - mid.y) * 2;

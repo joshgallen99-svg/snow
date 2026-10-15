@@ -710,10 +710,10 @@ const LIFT_BY_ID = Object.fromEntries(LIFTS.map((l, i) => [l.id, Object.assign(l
 
 // kicker sizes: [length, lip height, width, landing drop, landing length]
 const KICKER_SIZES = [
-  [6, 0.8, 5, 1.2, 14],
-  [9, 1.6, 7, 2.6, 22],
-  [12, 2.4, 8, 4.0, 30],
-  [15, 3.2, 9, 5.5, 38],
+  [6, 0.9, 5, 1.4, 14],
+  [9, 1.9, 7, 3.0, 24],
+  [12, 2.9, 8, 4.6, 32],
+  [15, 3.8, 9, 6.2, 40],
 ];
 
 // Village and base buildings: [x, z, kind, rotation]
@@ -2053,7 +2053,7 @@ const Vegetation = {
   },
   birchGeometry(lod) {
     const b = new GeoBuilder();
-    const bark = 0xe9e5dc, mark = 0x3b3631, twig = 0x5e504b, crown = 0x8a7a78;
+    const bark = 0xe9e5dc, mark = 0x3b3631, twig = 0x6a5a55, crown = 0xb3a2a0;
     if (lod === 1) {
       b.add(G.cone(0.14, 6, 3), { y: 3, color: bark });
       b.add(new THREE.OctahedronGeometry(1.5, 0), { y: 7.0, sy: 1.7, color: 0x857773 });
@@ -2074,8 +2074,10 @@ const Vegetation = {
       _q.setFromUnitVectors(_v.set(0, 1, 0), _v2.set(cx, cy, cz).normalize());
       _m4.compose(_v.set(cx, y + cy, cz), _q, _s.set(1, 1, 1));
       b.add(G.cyl(0.025, 0.055, len, 4), { matrix: _m4.clone(), color: twig });
-      _m4.compose(_v.set(cx * 2.05, y + cy * 2.05 + 0.25, cz * 2.05), _q, _s.set(0.42, 1.25, 0.42));
-      b.add(new THREE.OctahedronGeometry(0.7, 0), { matrix: _m4.clone(), color: crown, colorFn: snowCap(0.9) });
+      for (const [f, k] of [[2.05, 0.7], [1.45, 0.5]]) {
+        _m4.compose(_v.set(cx * f, y + cy * f + 0.2, cz * f), _q, _s.set(0.34, 1.15, 0.34));
+        b.add(new THREE.OctahedronGeometry(k, 0), { matrix: _m4.clone(), color: crown, colorFn: snowCap(0.9) });
+      }
     }
     b.add(new THREE.OctahedronGeometry(0.6, 0), { y: 9.0, sx: 0.5, sy: 1.6, sz: 0.5, color: crown });
     return b.build();
@@ -3720,13 +3722,14 @@ const Sky = {
     scene.add(this.snowPts);
   },
 
-  setWeather(state) {
+  setWeather(state, snap = false) {
     const T = this.weather.target;
     this.weather.state = state;
     if (state === 'clear') Object.assign(T, { overcast: 0.05, snow: 0, wind: 0.15 });
     else if (state === 'cloudy') Object.assign(T, { overcast: 0.6, snow: 0.05, wind: 0.3 });
     else if (state === 'snow') Object.assign(T, { overcast: 0.82, snow: 0.45, wind: 0.35 });
     else if (state === 'storm') Object.assign(T, { overcast: 1, snow: 1, wind: 0.9 });
+    if (snap) Object.assign(this.weather, { overcast: T.overcast, snow: T.snow, wind: T.wind });
   },
   weatherTick(dt) {
     const W = this.weather;
@@ -3924,10 +3927,10 @@ const FX = {
         float depth = vTrail.z;            // 0 groomed .. 1 deep powder
         float groove = 1.0 - across * across;
         // compacted snow is smoother and a little grey-blue; the side walls catch light
-        vec3 packed = mix(vec3(0.80, 0.85, 0.93), vec3(0.68, 0.76, 0.88), depth);
+        vec3 packed = mix(vec3(0.84, 0.88, 0.95), vec3(0.72, 0.8, 0.92), depth);
         float wall = smoothstep(0.55, 0.95, abs(across));
-        diffuseColor.rgb = mix(packed, vec3(0.96, 0.98, 1.0), wall * (0.4 + depth * 0.5));
-        diffuseColor.a = vTrail.y * (0.55 + 0.35 * depth) * (1.0 - smoothstep(0.92, 1.0, abs(across)));`,
+        diffuseColor.rgb = mix(packed, vec3(0.97, 0.98, 1.0), wall * (0.4 + depth * 0.5));
+        diffuseColor.a = vTrail.y * (0.32 + 0.4 * depth) * (1.0 - smoothstep(0.6, 1.0, abs(across)));`,
     });
     const prev = mat.onBeforeCompile;
     mat.onBeforeCompile = (sh, r) => {
@@ -3936,7 +3939,7 @@ const FX = {
         {
           float ac = vTrail.x;
           // slope of the groove cross-section: carved down the middle, raised lips
-          float sl = -ac * 0.9 * (0.35 + vTrail.z) + sign(ac) * smoothstep(0.7, 1.0, abs(ac)) * 0.8;
+          float sl = -ac * 0.45 * (0.3 + vTrail.z) + sign(ac) * smoothstep(0.7, 1.0, abs(ac)) * 0.5;
           vec3 side = vec3(cos(vTrail.w), 0.0, sin(vTrail.w));
           normal = normalize(normal + (viewMatrix * vec4(side * sl, 0.0)).xyz);
         }`);
@@ -4336,6 +4339,19 @@ const Cam = {
     out.pos.copy(base).addScaledVector(this.dir, -dist).add(new V3(0, height, 0));
     const gh = World.groundHeight(out.pos.x, out.pos.z) + 1.3;
     if (out.pos.y < gh) out.pos.y = gh;
+    // keep the camera out of tree canopies: pull in toward the rider before the first one
+    World.queryColliders((base.x + out.pos.x) / 2, (base.z + out.pos.z) / 2, dist * 0.6 + 4, this._cc || (this._cc = []));
+    let tMin = 1;
+    for (const c of this._cc) {
+      if (c.kind !== 'tree') continue;
+      const R = c.r * 2.6 + 0.4;
+      for (let k = 2; k <= 10; k++) {
+        const t = k / 10;
+        const x = lerp(base.x, out.pos.x, t), z = lerp(base.z, out.pos.z, t);
+        if ((x - c.x) ** 2 + (z - c.z) ** 2 < R * R && lerp(base.y, out.pos.y, t) < c.top) { tMin = Math.min(tMin, t - 0.1); break; }
+      }
+    }
+    if (tMin < 1) out.pos.lerpVectors(base, out.pos, Math.max(0.35, tMin)).add(new V3(0, (1 - tMin) * 1.2, 0));
     const mid = new V3().lerpVectors(base, out.pos, 0.5);
     const mh = World.groundHeight(mid.x, mid.z) + 1.0;
     if (mid.y < mh) out.pos.y += (mh - mid.y) * 2;
@@ -4914,7 +4930,7 @@ const UI = {
   loading(p, text) { $('loadBar').style.width = (p * 100).toFixed(0) + '%'; $('loadStep').textContent = text; },
   doneLoading() { $('loading').hidden = true; },
   open(id, overPause = false) {
-    for (const p of this.panels) if (!(overPause && p === 'pause')) $(p).hidden = p !== id;
+    for (const p of this.panels) $(p).hidden = p !== id;
     this.returnToPause = overPause;
     if (id === 'settings') this.syncSettings();
   },
@@ -5233,7 +5249,8 @@ const Game = {
     Sound.setVolumes(s.music, s.sfx);
     if (s.time === 'cycle') Sky.cycle = true; else { Sky.cycle = false; Sky.time = +s.time; }
     Sky.autoWeather = s.weather === 'auto';
-    if (s.weather !== 'auto' && Sky.weather.state !== s.weather) Sky.setWeather(s.weather);
+    if (s.weather !== 'auto' && Sky.weather.state !== s.weather) Sky.setWeather(s.weather, !this.weatherApplied);
+    this.weatherApplied = true;
     Cam.cineOn = s.cine;
     if (this.rider) this.rider.stance = s.stance;
     if (this.renderer) {
@@ -5301,8 +5318,10 @@ const Game = {
     if (this.state === 'locker' && this.lodgeSpot) {
       const r = this.lodgeSpot;
       const a = t * 0.25;
-      const off = new V3(Math.sin(a), 0, Math.cos(a)).multiplyScalar(3.4);
-      return { pos: r.clone().add(off).add(new V3(0, 1.5, 0)), look: r.clone().add(new V3(0, 0.85, 0)), fov: 42 };
+      const o = new V3(Math.sin(a), 0, Math.cos(a));
+      const right = new V3().crossVectors(o.clone().negate(), UP).normalize();
+      // look a little to the right of the rider so they stand clear of the locker panel
+      return { pos: r.clone().addScaledVector(o, 4.3).add(new V3(0, 1.45, 0)), look: r.clone().add(new V3(0, 0.85, 0)).addScaledVector(right, innerWidth > 800 ? 1.25 : 0), fov: 42 };
     }
     const sway = Math.sin(t * 0.05) * 18;
     const pos = new V3(b.x, b.y, b.z).addScaledVector(toPeak, -70).addScaledVector(side, 46 + sway).add(new V3(0, 14, 0));
@@ -5379,7 +5398,7 @@ const Game = {
     R.shotT += dt;
     if (R.shotT > 4.5) { R.shotT = 0; R.shot = (R.shot + 1) % 3; R.anchor = null; Sound.clack(); }
     const side = new V3(-travel.z, 0, travel.x);
-    const seat = new V3(p.x, p.y - (T.cabin ? 2.6 : T.surface ? -1 : 2.0), p.z);
+    const seat = T.surface ? new V3(p.x, World.height(p.x, p.z) + 1.3, p.z) : new V3(p.x, p.y - (T.cabin ? 2.6 : 2.0), p.z);
     let pos, look, fov = 52;
     if (R.shot === 0) {
       pos = seat.clone().addScaledVector(slope, -6.5).addScaledVector(side, 2.6).add(new V3(0, 3.0, 0));

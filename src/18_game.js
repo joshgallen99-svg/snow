@@ -120,7 +120,8 @@ const Game = {
     Sound.setVolumes(s.music, s.sfx);
     if (s.time === 'cycle') Sky.cycle = true; else { Sky.cycle = false; Sky.time = +s.time; }
     Sky.autoWeather = s.weather === 'auto';
-    if (s.weather !== 'auto' && Sky.weather.state !== s.weather) Sky.setWeather(s.weather);
+    if (s.weather !== 'auto' && Sky.weather.state !== s.weather) Sky.setWeather(s.weather, !this.weatherApplied);
+    this.weatherApplied = true;
     Cam.cineOn = s.cine;
     if (this.rider) this.rider.stance = s.stance;
     if (this.renderer) {
@@ -188,8 +189,10 @@ const Game = {
     if (this.state === 'locker' && this.lodgeSpot) {
       const r = this.lodgeSpot;
       const a = t * 0.25;
-      const off = new V3(Math.sin(a), 0, Math.cos(a)).multiplyScalar(3.4);
-      return { pos: r.clone().add(off).add(new V3(0, 1.5, 0)), look: r.clone().add(new V3(0, 0.85, 0)), fov: 42 };
+      const o = new V3(Math.sin(a), 0, Math.cos(a));
+      const right = new V3().crossVectors(o.clone().negate(), UP).normalize();
+      // look a little to the right of the rider so they stand clear of the locker panel
+      return { pos: r.clone().addScaledVector(o, 4.3).add(new V3(0, 1.45, 0)), look: r.clone().add(new V3(0, 0.85, 0)).addScaledVector(right, innerWidth > 800 ? 1.25 : 0), fov: 42 };
     }
     const sway = Math.sin(t * 0.05) * 18;
     const pos = new V3(b.x, b.y, b.z).addScaledVector(toPeak, -70).addScaledVector(side, 46 + sway).add(new V3(0, 14, 0));
@@ -266,7 +269,7 @@ const Game = {
     R.shotT += dt;
     if (R.shotT > 4.5) { R.shotT = 0; R.shot = (R.shot + 1) % 3; R.anchor = null; Sound.clack(); }
     const side = new V3(-travel.z, 0, travel.x);
-    const seat = new V3(p.x, p.y - (T.cabin ? 2.6 : T.surface ? -1 : 2.0), p.z);
+    const seat = T.surface ? new V3(p.x, World.height(p.x, p.z) + 1.3, p.z) : new V3(p.x, p.y - (T.cabin ? 2.6 : 2.0), p.z);
     let pos, look, fov = 52;
     if (R.shot === 0) {
       pos = seat.clone().addScaledVector(slope, -6.5).addScaledVector(side, 2.6).add(new V3(0, 3.0, 0));

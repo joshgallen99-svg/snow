@@ -163,13 +163,14 @@ const Sky = {
     scene.add(this.snowPts);
   },
 
-  setWeather(state) {
+  setWeather(state, snap = false) {
     const T = this.weather.target;
     this.weather.state = state;
     if (state === 'clear') Object.assign(T, { overcast: 0.05, snow: 0, wind: 0.15 });
     else if (state === 'cloudy') Object.assign(T, { overcast: 0.6, snow: 0.05, wind: 0.3 });
     else if (state === 'snow') Object.assign(T, { overcast: 0.82, snow: 0.45, wind: 0.35 });
     else if (state === 'storm') Object.assign(T, { overcast: 1, snow: 1, wind: 0.9 });
+    if (snap) Object.assign(this.weather, { overcast: T.overcast, snow: T.snow, wind: T.wind });
   },
   weatherTick(dt) {
     const W = this.weather;

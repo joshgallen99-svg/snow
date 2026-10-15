@@ -125,10 +125,10 @@ const FX = {
         float depth = vTrail.z;            // 0 groomed .. 1 deep powder
         float groove = 1.0 - across * across;
         // compacted snow is smoother and a little grey-blue; the side walls catch light
-        vec3 packed = mix(vec3(0.80, 0.85, 0.93), vec3(0.68, 0.76, 0.88), depth);
+        vec3 packed = mix(vec3(0.84, 0.88, 0.95), vec3(0.72, 0.8, 0.92), depth);
         float wall = smoothstep(0.55, 0.95, abs(across));
-        diffuseColor.rgb = mix(packed, vec3(0.96, 0.98, 1.0), wall * (0.4 + depth * 0.5));
-        diffuseColor.a = vTrail.y * (0.55 + 0.35 * depth) * (1.0 - smoothstep(0.92, 1.0, abs(across)));`,
+        diffuseColor.rgb = mix(packed, vec3(0.97, 0.98, 1.0), wall * (0.4 + depth * 0.5));
+        diffuseColor.a = vTrail.y * (0.32 + 0.4 * depth) * (1.0 - smoothstep(0.6, 1.0, abs(across)));`,
     });
     const prev = mat.onBeforeCompile;
     mat.onBeforeCompile = (sh, r) => {
@@ -137,7 +137,7 @@ const FX = {
         {
           float ac = vTrail.x;
           // slope of the groove cross-section: carved down the middle, raised lips
-          float sl = -ac * 0.9 * (0.35 + vTrail.z) + sign(ac) * smoothstep(0.7, 1.0, abs(ac)) * 0.8;
+          float sl = -ac * 0.45 * (0.3 + vTrail.z) + sign(ac) * smoothstep(0.7, 1.0, abs(ac)) * 0.5;
           vec3 side = vec3(cos(vTrail.w), 0.0, sin(vTrail.w));
           normal = normalize(normal + (viewMatrix * vec4(side * sl, 0.0)).xyz);
         }`);

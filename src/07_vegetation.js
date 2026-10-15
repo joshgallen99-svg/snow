@@ -25,7 +25,7 @@ const Vegetation = {
   },
   birchGeometry(lod) {
     const b = new GeoBuilder();
-    const bark = 0xe9e5dc, mark = 0x3b3631, twig = 0x5e504b, crown = 0x8a7a78;
+    const bark = 0xe9e5dc, mark = 0x3b3631, twig = 0x6a5a55, crown = 0xb3a2a0;
     if (lod === 1) {
       b.add(G.cone(0.14, 6, 3), { y: 3, color: bark });
       b.add(new THREE.OctahedronGeometry(1.5, 0), { y: 7.0, sy: 1.7, color: 0x857773 });
@@ -46,8 +46,10 @@ const Vegetation = {
       _q.setFromUnitVectors(_v.set(0, 1, 0), _v2.set(cx, cy, cz).normalize());
       _m4.compose(_v.set(cx, y + cy, cz), _q, _s.set(1, 1, 1));
       b.add(G.cyl(0.025, 0.055, len, 4), { matrix: _m4.clone(), color: twig });
-      _m4.compose(_v.set(cx * 2.05, y + cy * 2.05 + 0.25, cz * 2.05), _q, _s.set(0.42, 1.25, 0.42));
-      b.add(new THREE.OctahedronGeometry(0.7, 0), { matrix: _m4.clone(), color: crown, colorFn: snowCap(0.9) });
+      for (const [f, k] of [[2.05, 0.7], [1.45, 0.5]]) {
+        _m4.compose(_v.set(cx * f, y + cy * f + 0.2, cz * f), _q, _s.set(0.34, 1.15, 0.34));
+        b.add(new THREE.OctahedronGeometry(k, 0), { matrix: _m4.clone(), color: crown, colorFn: snowCap(0.9) });
+      }
     }
     b.add(new THREE.OctahedronGeometry(0.6, 0), { y: 9.0, sx: 0.5, sy: 1.6, sz: 0.5, color: crown });
     return b.build();

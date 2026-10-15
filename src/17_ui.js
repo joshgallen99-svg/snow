@@ -35,7 +35,7 @@ const UI = {
   loading(p, text) { $('loadBar').style.width = (p * 100).toFixed(0) + '%'; $('loadStep').textContent = text; },
   doneLoading() { $('loading').hidden = true; },
   open(id, overPause = false) {
-    for (const p of this.panels) if (!(overPause && p === 'pause')) $(p).hidden = p !== id;
+    for (const p of this.panels) $(p).hidden = p !== id;
     this.returnToPause = overPause;
     if (id === 'settings') this.syncSettings();
   },

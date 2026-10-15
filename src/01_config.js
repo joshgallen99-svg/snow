@@ -201,10 +201,10 @@ const LIFT_BY_ID = Object.fromEntries(LIFTS.map((l, i) => [l.id, Object.assign(l
 
 // kicker sizes: [length, lip height, width, landing drop, landing length]
 const KICKER_SIZES = [
-  [6, 0.8, 5, 1.2, 14],
-  [9, 1.6, 7, 2.6, 22],
-  [12, 2.4, 8, 4.0, 30],
-  [15, 3.2, 9, 5.5, 38],
+  [6, 0.9, 5, 1.4, 14],
+  [9, 1.9, 7, 3.0, 24],
+  [12, 2.9, 8, 4.6, 32],
+  [15, 3.8, 9, 6.2, 40],
 ];
 
 // Village and base buildings: [x, z, kind, rotation]
