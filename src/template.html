@@ -1,0 +1,371 @@
+<title>Kitakaze Peak</title>
+<meta name="description" content="A low-poly snowboarding game on a Japanese volcano resort. Pick a lift on the live mountain cam and ride.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Kalam:wght@400;700&family=Shippori+Mincho+B1:wght@700;800&display=swap">
+<style>
+/* Layout: full-bleed WebGL canvas; UI floats in navy-glass panels pinned to the corners. */
+:root {
+  --ink: #0f1a2c;
+  --glass: rgba(14, 24, 42, 0.74);
+  --glass-hi: rgba(22, 36, 60, 0.88);
+  --line: rgba(255, 255, 255, 0.14);
+  --text: #f3f6fa;
+  --muted: #a9b6c8;
+  --amber: #f2b14a;
+  --snow: #f6f8fb;
+  --green: #2fa84f; --red: #d8332b; --black: #15171b; --park: #ff8a1f;
+  --good: #59d38c; --bad: #ff6b5e;
+  --f-ui: 'Outfit', 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
+  --f-map: 'Kalam', 'Comic Sans MS', 'Segoe Print', cursive;
+  --f-display: 'Shippori Mincho B1', 'Hiragino Mincho ProN', 'Yu Mincho', Georgia, serif;
+  --r: 14px;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; background: #0b1220; color: var(--text); overflow: hidden; font-family: var(--f-ui); -webkit-font-smoothing: antialiased; }
+#game { position: fixed; inset: 0; }
+#game canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+button { font: inherit; color: inherit; }
+.btn { appearance: none; border: 1px solid var(--line); background: rgba(255,255,255,0.06); padding: 10px 16px; border-radius: 10px; cursor: pointer; font-weight: 600; letter-spacing: 0.01em; transition: background .15s, border-color .15s, transform .1s; }
+.btn:hover { background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.3); }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible, .tab:focus-visible, .lift-tag:focus-visible, .card:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.btn.primary { background: var(--amber); color: #1b1408; border-color: transparent; }
+.btn.primary:hover { background: #ffc566; }
+.btn.small { padding: 6px 10px; font-size: 13px; border-radius: 8px; }
+.btn[disabled] { opacity: .45; cursor: not-allowed; }
+.glass { background: var(--glass); border: 1px solid var(--line); border-radius: var(--r); backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2); box-shadow: 0 12px 40px rgba(0,0,0,.28); }
+.eyebrow { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* difficulty icons */
+.d-ico { display: inline-block; width: 12px; height: 12px; flex: none; vertical-align: -1px; border: 1.5px solid #fff; box-sizing: border-box; }
+.diff-green .d-ico { background: var(--green); border-radius: 50%; }
+.diff-red .d-ico { background: var(--red); }
+.diff-black .d-ico { background: var(--black); transform: rotate(45deg) scale(.85); }
+.diff-double .d-ico { background: var(--black); transform: rotate(45deg) scale(.85); box-shadow: 9px -9px 0 -1.5px var(--black), 9px -9px 0 0 #fff; margin-right: 8px; }
+.diff-park .d-ico { background: var(--park); border-radius: 3px; width: 16px; }
+
+/* loading */
+#loading { position: fixed; inset: 0; display: grid; place-items: center; background: radial-gradient(120% 90% at 50% 100%, #1b2c4a 0%, #0b1220 60%); z-index: 50; }
+#loading .wrap { width: min(420px, calc(100vw - 48px)); text-align: center; }
+#loading .kanji { font-family: var(--f-display); font-size: 64px; letter-spacing: .1em; color: var(--snow); }
+#loading .name { font-family: var(--f-display); font-size: 22px; letter-spacing: .35em; text-transform: uppercase; margin: 4px 0 28px; color: var(--muted); }
+.bar { height: 4px; background: rgba(255,255,255,.12); border-radius: 4px; overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--amber); transition: width .25s; }
+#loadStep { margin-top: 12px; color: var(--muted); font-size: 14px; min-height: 1.4em; }
+
+/* title / lodge */
+#title { position: fixed; left: max(28px, env(safe-area-inset-left, 0px)); top: 50%; transform: translateY(-50%); width: min(380px, calc(100vw - 56px)); padding: 28px; z-index: 10; }
+#title .kanji { font-family: var(--f-display); font-size: 46px; line-height: 1; letter-spacing: .08em; }
+#title h1 { font-family: var(--f-display); font-weight: 800; font-size: 30px; letter-spacing: .2em; text-transform: uppercase; margin: 6px 0 4px; text-wrap: balance; }
+#title p { color: var(--muted); margin: 0 0 22px; line-height: 1.5; }
+#title .menu { display: grid; gap: 10px; }
+#title .menu .btn { text-align: left; padding: 13px 16px; font-size: 16px; display: flex; justify-content: space-between; align-items: center; }
+#title .menu .btn span:last-child { color: var(--muted); font-weight: 500; font-size: 13px; }
+#title .menu .btn.primary span:last-child { color: rgba(27,20,8,.7); }
+#title .foot { margin-top: 20px; display: flex; gap: 18px; color: var(--muted); font-size: 13px; }
+#title .foot b { color: var(--text); }
+
+/* generic modal panel */
+.panel { position: fixed; z-index: 20; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; padding: 24px; box-sizing: border-box; }
+.panel h2 { margin: 0 0 4px; font-size: 24px; font-weight: 700; text-wrap: balance; }
+.panel .sub { color: var(--muted); margin: 0 0 18px; }
+.panel .row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+.tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.tab { appearance: none; border: 1px solid var(--line); background: transparent; padding: 7px 12px; border-radius: 999px; cursor: pointer; font-weight: 600; font-size: 14px; }
+.tab[aria-selected="true"] { background: var(--text); color: var(--ink); }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.card { appearance: none; text-align: left; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.04); padding: 10px; cursor: pointer; display: grid; gap: 8px; }
+.card .sw { height: 44px; border-radius: 8px; }
+.card .nm { font-weight: 600; }
+.card .ct { font-size: 12px; color: var(--muted); }
+.card.sel { border-color: var(--amber); box-shadow: inset 0 0 0 1px var(--amber); }
+.card.lock { opacity: .55; }
+#locker { left: auto; right: max(24px, env(safe-area-inset-right, 0px)); transform: translateY(-50%); width: min(460px, calc(100vw - 32px)); }
+table.rec { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.rec th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+table.rec td { padding: 9px 8px; border-bottom: 1px solid rgba(255,255,255,.06); }
+table.rec td.n { display: flex; gap: 8px; align-items: center; }
+.set { display: grid; grid-template-columns: 1fr auto; gap: 12px 18px; align-items: center; }
+.set label { color: var(--text); }
+.set select, .set input[type=range] { width: 200px; max-width: 46vw; }
+select { background: rgba(255,255,255,.08); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font: inherit; }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; font-size: 14px; }
+kbd { display: inline-block; min-width: 18px; padding: 2px 7px; border-radius: 6px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2); border-bottom-width: 2px; font-family: var(--f-ui); font-size: 12px; font-weight: 600; text-align: center; margin-right: 3px; }
+
+/* HUD */
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+#hud .tl { position: absolute; left: max(18px, env(safe-area-inset-left, 0px)); top: max(16px, env(safe-area-inset-top, 0px)); padding: 10px 14px; display: grid; gap: 6px; min-width: 210px; }
+#hud .runline { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
+#hud .mode { font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+#hud .prog { height: 3px; background: rgba(255,255,255,.15); border-radius: 3px; overflow: hidden; }
+#hud .prog i { display: block; height: 100%; width: 0; background: var(--text); }
+#hud .tc { position: absolute; left: 50%; top: max(16px, env(safe-area-inset-top, 0px)); transform: translateX(-50%); text-align: center; padding: 8px 18px; }
+#hud .timer { font-size: 30px; font-weight: 700; letter-spacing: .02em; }
+#hud .split { font-size: 14px; font-weight: 600; min-height: 1.2em; }
+#hud .split.ahead { color: var(--good); } #hud .split.behind { color: var(--bad); }
+#hud .tr { position: absolute; right: max(18px, env(safe-area-inset-right, 0px)); top: max(16px, env(safe-area-inset-top, 0px)); padding: 10px 14px; text-align: right; display: grid; gap: 4px; }
+#hud .flakes { font-size: 20px; font-weight: 700; display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+#hud .flakes svg { width: 18px; height: 18px; }
+#hud .clock { font-size: 13px; color: var(--muted); }
+#hud .bl { position: absolute; left: max(18px, env(safe-area-inset-left, 0px)); bottom: max(18px, env(safe-area-inset-bottom, 0px)); padding: 10px 16px; }
+#hud .speed { font-size: 40px; font-weight: 800; line-height: 1; }
+#hud .speed small { font-size: 14px; font-weight: 600; color: var(--muted); margin-left: 4px; }
+#hud .alt { font-size: 13px; color: var(--muted); margin-top: 4px; }
+#hud .br { position: absolute; right: max(18px, env(safe-area-inset-right, 0px)); bottom: max(18px, env(safe-area-inset-bottom, 0px)); padding: 10px 14px; text-align: right; }
+#hud .score { font-size: 26px; font-weight: 700; }
+#hud .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+#tricks { position: absolute; left: 50%; bottom: max(110px, calc(env(safe-area-inset-bottom, 0px) + 110px)); transform: translateX(-50%); display: flex; flex-direction: column-reverse; align-items: center; gap: 6px; }
+.trick { padding: 8px 16px; font-weight: 700; font-size: 18px; white-space: nowrap; animation: trickIn .35s cubic-bezier(.2,1.4,.4,1); text-shadow: 0 2px 10px rgba(0,0,0,.4); }
+.trick b { color: var(--amber); margin-left: 10px; }
+.trick em { font-style: normal; color: var(--muted); font-size: 13px; margin-left: 8px; }
+.trick.sketch { opacity: .75; }
+.trick.out { animation: trickOut .5s forwards; }
+@keyframes trickIn { from { transform: translateY(14px) scale(.9); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes trickOut { to { transform: translateY(-14px); opacity: 0; } }
+#combo { position: absolute; left: 50%; bottom: max(70px, calc(env(safe-area-inset-bottom, 0px) + 70px)); transform: translateX(-50%); font-weight: 800; font-size: 16px; color: var(--amber); letter-spacing: .08em; text-shadow: 0 2px 8px rgba(0,0,0,.5); }
+#msg { position: absolute; left: 50%; top: 36%; transform: translate(-50%, -50%); text-align: center; text-shadow: 0 4px 20px rgba(0,0,0,.45); }
+#msg .big { font-size: 46px; font-weight: 800; letter-spacing: .02em; }
+#msg .small { font-size: 16px; color: var(--text); opacity: .9; margin-top: 6px; }
+#msg.show { animation: msgIn .4s ease-out; }
+@keyframes msgIn { from { opacity: 0; transform: translate(-50%, -40%); } }
+#prompt { position: absolute; left: 50%; bottom: 26%; transform: translateX(-50%); padding: 10px 16px; font-weight: 600; }
+
+/* map UI */
+#mapUI { position: fixed; inset: 0; pointer-events: none; z-index: 6; }
+#mapUI > * { pointer-events: auto; }
+#cartouche { position: absolute; left: max(18px, env(safe-area-inset-left, 0px)); top: max(16px, env(safe-area-inset-top, 0px)); padding: 14px 18px; display: grid; gap: 4px; }
+#cartouche .t { display: flex; align-items: baseline; gap: 10px; }
+#cartouche .t .k { font-family: var(--f-display); font-size: 26px; }
+#cartouche .t .n { font-family: var(--f-display); font-weight: 800; letter-spacing: .2em; text-transform: uppercase; font-size: 18px; }
+#cartouche .live { font-size: 12px; color: var(--muted); display: flex; gap: 8px; align-items: center; letter-spacing: .06em; }
+#cartouche .live i { width: 8px; height: 8px; border-radius: 50%; background: #ff4d4d; box-shadow: 0 0 0 0 rgba(255,77,77,.6); animation: live 1.6s infinite; }
+@keyframes live { 70% { box-shadow: 0 0 0 7px rgba(255,77,77,0); } 100% { box-shadow: 0 0 0 0 rgba(255,77,77,0); } }
+#legend { position: absolute; left: max(18px, env(safe-area-inset-left, 0px)); bottom: max(18px, env(safe-area-inset-bottom, 0px)); padding: 12px 14px; display: grid; grid-template-columns: auto auto; gap: 6px 14px; font-size: 13px; }
+#legend .it { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+#legend .ln { width: 26px; height: 3px; border-radius: 2px; box-shadow: 0 0 0 1.5px #fff; }
+#legend .ln.dot { background: repeating-linear-gradient(90deg, var(--c) 0 5px, transparent 5px 9px) !important; box-shadow: none; height: 3px; }
+#mapCtl { position: absolute; right: max(18px, env(safe-area-inset-right, 0px)); bottom: max(18px, env(safe-area-inset-bottom, 0px)); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; max-width: 70vw; }
+#mapHint { position: absolute; left: 50%; top: max(16px, env(safe-area-inset-top, 0px)); transform: translateX(-50%); padding: 8px 14px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+#liftPanel { position: absolute; right: max(18px, env(safe-area-inset-right, 0px)); top: max(16px, env(safe-area-inset-top, 0px)); width: min(400px, calc(100vw - 36px)); max-height: calc(100vh - 110px); overflow: auto; padding: 18px; box-sizing: border-box; }
+#liftPanel h3 { margin: 6px 0 2px; font-size: 22px; display: flex; gap: 10px; align-items: center; }
+#liftPanel h3 .sw { width: 10px; height: 22px; border-radius: 3px; }
+#liftPanel .stats { display: flex; gap: 16px; color: var(--muted); font-size: 13px; margin: 8px 0 12px; flex-wrap: wrap; }
+#liftPanel .stats b { color: var(--text); font-weight: 600; }
+#liftPanel .lockmsg { padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,.06); color: var(--muted); font-size: 14px; }
+.runrow { border-top: 1px solid var(--line); padding: 12px 0; display: grid; gap: 6px; }
+.runrow .h { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.runrow .h .len { margin-left: auto; color: var(--muted); font-weight: 500; font-size: 12px; }
+.runrow p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.runrow .meta { display: flex; gap: 14px; font-size: 12px; color: var(--muted); }
+.runrow .meta b { color: var(--text); }
+.runrow .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.done { color: var(--good) !important; }
+#mapLabels { position: fixed; inset: 0; pointer-events: none; z-index: 4; }
+.lift-tag { position: absolute; left: 0; top: 0; pointer-events: auto; display: flex; align-items: center; gap: 6px; padding: 4px 9px 4px 4px; border-radius: 7px; background: rgba(250,251,253,.94); color: #10192a; border: 1px solid rgba(16,25,42,.25); font-family: var(--f-ui); font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.18); }
+.lift-tag .lt-bar { width: 5px; height: 16px; border-radius: 2px; }
+.lift-tag.hot { background: #10192a; color: #fff; border-color: #fff; box-shadow: 0 0 0 2px #10192a; }
+.lift-tag.locked .lt-lock::before { content: ''; display: inline-block; width: 8px; height: 7px; background: currentColor; border-radius: 1px; margin-left: 2px; position: relative; top: 1px; box-shadow: 0 -4px 0 -1px transparent; }
+.lift-tag.locked { opacity: .78; }
+.run-tag { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 5px; font-family: var(--f-map); font-weight: 700; font-size: 14px; color: #16202f; white-space: nowrap; text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 6px #fff; transition: opacity .2s; }
+.run-tag.dim { opacity: .35; }
+.run-tag .d-ico { width: 10px; height: 10px; }
+
+/* results / pause */
+#results .big { font-size: 48px; font-weight: 800; }
+#results .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 14px; }
+#results .grid > div { padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,.06); }
+#results .grid b { display: block; font-size: 20px; margin-top: 2px; }
+.newbest { display: inline-block; margin-left: 10px; padding: 3px 9px; border-radius: 999px; background: var(--amber); color: #1b1408; font-size: 13px; font-weight: 800; vertical-align: middle; }
+#toast { position: fixed; left: 50%; top: max(84px, calc(env(safe-area-inset-top, 0px) + 84px)); transform: translateX(-50%); z-index: 30; padding: 10px 16px; font-weight: 600; transition: opacity .3s; }
+#liftHint { position: fixed; left: 50%; bottom: max(28px, calc(env(safe-area-inset-bottom, 0px) + 28px)); transform: translateX(-50%); z-index: 6; padding: 10px 16px; font-size: 14px; }
+#fade { position: fixed; inset: 0; background: #0b1220; opacity: 0; pointer-events: none; transition: opacity .45s; z-index: 40; }
+@media (max-height: 760px) {
+  #title { padding: 20px; }
+  #title .kanji { font-size: 34px; }
+  #title h1 { font-size: 24px; }
+  #title p { margin-bottom: 14px; font-size: 14px; }
+  #title .menu .btn { padding: 9px 14px; font-size: 15px; }
+  #title .foot { margin-top: 12px; }
+}
+@media (max-width: 640px) {
+  #legend { display: none; }
+  #hud .speed { font-size: 30px; }
+  #title { top: auto; bottom: 16px; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) { .trick, #msg.show { animation: none; } }
+</style>
+
+<div id="game"></div>
+
+<div id="loading">
+  <div class="wrap">
+    <div class="kanji" aria-hidden="true">北風</div>
+    <div class="name">Kitakaze Peak</div>
+    <div class="bar"><i id="loadBar"></i></div>
+    <div id="loadStep">Starting up</div>
+  </div>
+</div>
+
+<div id="mapLabels" hidden></div>
+
+<section id="title" class="glass" hidden>
+  <div class="kanji" aria-hidden="true">北風</div>
+  <h1>Kitakaze Peak</h1>
+  <p>A volcano resort in deep snow country. Eight lifts, thirteen runs, and all the powder you can find.</p>
+  <div class="menu">
+    <button class="btn primary" id="bRide"><span>Ride the mountain</span><span>Live cam</span></button>
+    <button class="btn" id="bLocker"><span>Gear locker</span><span id="bLockerNote">Boards &amp; outfits</span></button>
+    <button class="btn" id="bRecords"><span>Run records</span><span id="bRecNote"></span></button>
+    <button class="btn" id="bSettings"><span>Settings</span><span></span></button>
+    <button class="btn" id="bControls"><span>Controls</span><span>Keyboard &amp; touchpad</span></button>
+  </div>
+  <div class="foot"><div>Snowflakes <b id="tFlakes" class="num">0</b></div><div>Runs ridden <b id="tRuns" class="num">0</b> / 13</div></div>
+</section>
+
+<section id="locker" class="panel glass" hidden>
+  <div class="eyebrow">Gear locker</div>
+  <h2>Pick your setup</h2>
+  <p class="sub">Collect snowflakes on the runs to unlock more gear. You have <b id="lkFlakes" class="num">0</b>.</p>
+  <div class="tabs" role="tablist" id="lkTabs"></div>
+  <div class="cards" id="lkCards"></div>
+  <div class="row"><button class="btn" data-close>Back to the lodge</button></div>
+</section>
+
+<section id="records" class="panel glass" hidden>
+  <div class="eyebrow">Run records</div>
+  <h2>Every run on the mountain</h2>
+  <p class="sub">Best times are from time trials. A run counts as ridden once you finish it in either mode.</p>
+  <div style="overflow-x:auto"><table class="rec"><thead><tr><th>Run</th><th>Lift</th><th>Best</th><th>Flakes</th><th>Ridden</th></tr></thead><tbody id="recBody"></tbody></table></div>
+  <div class="row"><button class="btn" data-close>Close</button></div>
+</section>
+
+<section id="settings" class="panel glass" hidden>
+  <div class="eyebrow">Settings</div>
+  <h2>Settings</h2>
+  <p class="sub">Changes apply straight away and are saved in this browser.</p>
+  <div class="set">
+    <label for="sMusic">Music volume</label><input type="range" id="sMusic" min="0" max="1" step="0.05">
+    <label for="sSfx">Sound effects</label><input type="range" id="sSfx" min="0" max="1" step="0.05">
+    <label for="sQuality">Graphics quality</label><select id="sQuality"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select>
+    <label for="sTime">Time of day</label><select id="sTime"><option value="cycle">Cycle through the day</option><option value="7">Dawn</option><option value="11.5">Midday</option><option value="16.6">Golden hour</option><option value="20.5">Night skiing</option></select>
+    <label for="sWeather">Weather</label><select id="sWeather"><option value="auto">Changes over time</option><option value="clear">Bluebird</option><option value="cloudy">Overcast</option><option value="snow">Snowing</option><option value="storm">Whiteout</option></select>
+    <label for="sStance">Stance</label><select id="sStance"><option value="1">Regular (left foot forward)</option><option value="-1">Goofy (right foot forward)</option></select>
+    <label for="sCine">Cinematic jump camera</label><select id="sCine"><option value="1">On</option><option value="0">Off</option></select>
+    <label for="sGhost">Race your best-run ghost</label><select id="sGhost"><option value="0">Off</option><option value="1">On</option></select>
+    <label for="sUnlock">Unlock every lift</label><select id="sUnlock"><option value="0">No, earn them</option><option value="1">Yes</option></select>
+    <label for="sReset">Progress</label><button class="btn small" id="sReset">Reset progress</button>
+  </div>
+  <div class="row"><button class="btn" data-close>Done</button></div>
+</section>
+
+<section id="controls" class="panel glass" hidden>
+  <div class="eyebrow">Controls</div>
+  <h2>How to ride</h2>
+  <p class="sub">Keyboard for riding, touchpad or mouse for the mountain cam and the orbit camera.</p>
+  <div class="keys">
+    <div><kbd>A</kbd><kbd>D</kbd> or <kbd>←</kbd><kbd>→</kbd></div><div>Carve left and right. In the air: spin.</div>
+    <div><kbd>W</kbd> / <kbd>↑</kbd></div><div>Tuck for speed. In the air: frontflip. On flats: skate.</div>
+    <div><kbd>S</kbd> / <kbd>↓</kbd></div><div>Skid to slow down. In the air: backflip.</div>
+    <div><kbd>Space</kbd></div><div>Hold to crouch, release to ollie. Pop right at a kicker lip for extra air. Jump off rails.</div>
+    <div><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd><kbd>I</kbd></div><div>Grabs: Indy, Melon, Tail, Nose. Let go before you land.</div>
+    <div><kbd>C</kbd></div><div>Slow motion with an orbit camera. Drag to look around, scroll to zoom.</div>
+    <div><kbd>R</kbd></div><div>Respawn at your last safe spot.</div>
+    <div><kbd>E</kbd></div><div>Ride the lift you're standing at.</div>
+    <div><kbd>M</kbd></div><div>Open the mountain cam (trail map).</div>
+    <div><kbd>N</kbd></div><div>Music on or off.</div>
+    <div><kbd>Esc</kbd> / <kbd>P</kbd></div><div>Pause.</div>
+    <div>Mountain cam</div><div>Hover a lift to highlight it, click to choose. Drag to pan, scroll or pinch to zoom, right-drag or <kbd>Q</kbd><kbd>E</kbd> to rotate.</div>
+  </div>
+  <div class="row"><button class="btn" data-close>Got it</button></div>
+</section>
+
+<div id="hud" hidden>
+  <div class="tl glass">
+    <div class="runline"><i class="d-ico" id="hRunIco"></i><span id="hRun">Free ride</span></div>
+    <div class="mode" id="hMode">Free ride</div>
+    <div class="prog"><i id="hProg"></i></div>
+  </div>
+  <div class="tc glass" id="hTimerBox" hidden>
+    <div class="timer num" id="hTimer">0:00.00</div>
+    <div class="split num" id="hSplit"></div>
+  </div>
+  <div class="tr glass">
+    <div class="flakes"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#bfe8ff" d="M11 1h2v5.2l2.6-1.5 1 1.7L13 8.6V11h2.4l2.2-3.6 1.7 1-1.5 2.6H23v2h-5.2l1.5 2.6-1.7 1-2.2-3.6H13v2.4l3.6 2.2-1 1.7-2.6-1.5V23h-2v-5.2l-2.6 1.5-1-1.7L11 15.4V13H8.6l-2.2 3.6-1.7-1L6.2 13H1v-2h5.2L4.7 8.4l1.7-1L8.6 11H11V8.6L7.4 6.4l1-1.7L11 6.2z"/></svg><span class="num" id="hFlakes">0/0</span></div>
+    <div class="clock num" id="hClock"></div>
+  </div>
+  <div class="bl glass">
+    <div class="speed num"><span id="hSpeed">0</span><small>km/h</small></div>
+    <div class="alt num" id="hAlt"></div>
+  </div>
+  <div class="br glass">
+    <div class="score num" id="hScore">0</div>
+    <div class="hint">Trick points · <kbd>M</kbd> map · <kbd>Esc</kbd> pause</div>
+  </div>
+  <div id="tricks"></div>
+  <div id="combo"></div>
+  <div id="msg"></div>
+  <div id="prompt" class="glass" hidden></div>
+</div>
+
+<div id="mapUI" hidden>
+  <div id="cartouche" class="glass">
+    <div class="t"><span class="k" aria-hidden="true">北風</span><span class="n">Kitakaze Peak</span></div>
+    <div class="live"><i></i><span>LIVE MOUNTAIN CAM</span><span id="mClock" class="num"></span><span id="mWeather"></span></div>
+  </div>
+  <div id="mapHint" class="glass">Hover a lift to see its runs · click to choose · drag, scroll or pinch to move around</div>
+  <div id="legend" class="glass" aria-label="Map legend">
+    <div class="it"><span class="ln" style="background:var(--green)"></span>Beginner</div>
+    <div class="it"><span class="ln" style="background:var(--red)"></span>Intermediate</div>
+    <div class="it"><span class="ln" style="background:var(--black)"></span>Advanced</div>
+    <div class="it"><span class="ln dot" style="--c:var(--black)"></span>Ungroomed</div>
+    <div class="it"><span class="ln" style="background:var(--park)"></span>Terrain park</div>
+    <div class="it"><span class="ln" style="background:#ffd84a;height:8px;opacity:.7;box-shadow:none"></span>Night skiing</div>
+    <div class="it"><span class="ln" style="background:#15181d;height:2px;box-shadow:none"></span>Lift</div>
+    <div class="it"><span class="ln dot" style="--c:var(--red)"></span>Off limits</div>
+  </div>
+  <div id="mapCtl">
+    <button class="btn small" id="mZoomIn" aria-label="Zoom in">＋</button>
+    <button class="btn small" id="mZoomOut" aria-label="Zoom out">－</button>
+    <button class="btn small" id="mRotL" aria-label="Rotate left">⟲</button>
+    <button class="btn small" id="mRotR" aria-label="Rotate right">⟳</button>
+    <button class="btn small" id="mReset">Whole resort</button>
+    <button class="btn small" id="mLodge">Back to the lodge</button>
+  </div>
+  <aside id="liftPanel" class="glass" hidden></aside>
+</div>
+
+<section id="pause" class="panel glass" hidden style="width:min(380px, calc(100vw - 32px))">
+  <div class="eyebrow">Paused</div>
+  <h2 id="pRun">Free ride</h2>
+  <div class="row" style="flex-direction:column">
+    <button class="btn primary" id="pResume">Keep riding</button>
+    <button class="btn" id="pRestart">Restart this run</button>
+    <button class="btn" id="pMap">Mountain cam</button>
+    <button class="btn" id="pSettings">Settings</button>
+    <button class="btn" id="pControls">Controls</button>
+    <button class="btn" id="pLodge">Back to the lodge</button>
+  </div>
+</section>
+
+<section id="results" class="panel glass" hidden style="width:min(560px, calc(100vw - 32px))">
+  <div class="eyebrow" id="rEyebrow">Time trial</div>
+  <h2 id="rRun">Run</h2>
+  <div class="big num" id="rTime">0:00.00</div>
+  <div class="grid" id="rGrid"></div>
+  <div class="row">
+    <button class="btn primary" id="rAgain">Ride it again</button>
+    <button class="btn" id="rMap">Mountain cam</button>
+    <button class="btn" id="rFree">Free ride from here</button>
+  </div>
+</section>
+
+<div id="liftHint" class="glass" hidden></div>
+<div id="toast" class="glass" hidden></div>
+<div id="fade"></div>
+
+<script>
+/*__GAME__*/
+</script>

@@ -9,9 +9,8 @@ const Vegetation = {
     const b = new GeoBuilder();
     const snow = 0xeef3f8;
     if (lod === 1) {
-      b.add(G.cyl(0.18, 0.26, 1.6, 5), { y: 0.8, color: 0x4f3626 });
-      b.add(G.cone(2.3, 8.0, 6), { y: 1.2 + 4.0, color: 0x1e3b2b });
-      b.add(G.cone(1.75, 4.0, 6), { y: 1.2 + 8.0 - 2.0 + 0.1, color: snow, ry: 0.3 });
+      b.add(G.cone(2.3, 8.6, 6), { y: 0.6 + 4.3, color: 0x183224 });
+      b.add(G.cone(0.85, 2.3, 6), { y: 1.2 + 8.0 - 1.15 + 0.1, color: snow, ry: 0.3 });
       return b.build();
     }
     b.add(G.cyl(0.16, 0.27, 2.4, 6), { y: 1.2, color: 0x56392a });
@@ -19,16 +18,17 @@ const Vegetation = {
     tiers.forEach(([r, h, y0], i) => {
       const green = i % 2 ? 0x22432f : 0x1d3a29;
       b.add(G.cone(r, h, 7), { y: y0 + h / 2, color: green, ry: i * 0.7 });
-      b.add(G.cone(r * 0.8, h * 0.6, 7), { y: y0 + h - h * 0.3 + 0.08, color: snow, ry: i * 0.7 + 0.2 });
+      // snow sits in patches on the upper side of each tier, the needles still show
+      b.add(G.cone(r * 0.52, h * 0.4, 7), { y: y0 + h - h * 0.2 + 0.06, color: snow, ry: i * 0.7 + 0.2 });
     });
     return b.build();
   },
   birchGeometry(lod) {
     const b = new GeoBuilder();
-    const bark = 0xe9e5dc, mark = 0x3b3631, twig = 0x6f5d56, crown = 0x7d6b66;
+    const bark = 0xe9e5dc, mark = 0x3b3631, twig = 0x5e504b, crown = 0x8a7a78;
     if (lod === 1) {
-      b.add(G.cyl(0.09, 0.15, 8.5, 4), { y: 4.25, color: bark });
-      b.add(G.ico(1.9, 0), { y: 7.0, sy: 1.35, color: crown, colorFn: snowCap(0.75) });
+      b.add(G.cone(0.14, 6, 3), { y: 3, color: bark });
+      b.add(new THREE.OctahedronGeometry(1.5, 0), { y: 7.0, sy: 1.7, color: 0x857773 });
       return b.build();
     }
     // trunk in bands so the dark lenticels show
@@ -38,17 +38,18 @@ const Vegetation = {
       b.add(G.cyl(Math.max(0.05, rt), Math.max(0.06, rb), h, 6), { y: y0 + h / 2, color: c });
     }
     const rnd = mulberry32(11);
-    for (let i = 0; i < 7; i++) {
-      const y = 3.6 + i * 0.68, a = i * 2.4 + rnd(), len = 1.6 + rnd() * 1.6;
-      const tilt = 0.55 + rnd() * 0.4;
+    // bare winter crown: upswept branches ending in fine twig sprays (a purple-grey haze)
+    for (let i = 0; i < 6; i++) {
+      const y = 3.8 + i * 0.75, a = i * 2.4 + rnd(), len = 1.4 + rnd() * 1.4;
+      const tilt = 0.45 + rnd() * 0.35;
       const cx = Math.cos(a) * Math.sin(tilt) * len * 0.5, cz = Math.sin(a) * Math.sin(tilt) * len * 0.5, cy = Math.cos(tilt) * len * 0.5;
       _q.setFromUnitVectors(_v.set(0, 1, 0), _v2.set(cx, cy, cz).normalize());
       _m4.compose(_v.set(cx, y + cy, cz), _q, _s.set(1, 1, 1));
-      b.add(G.cyl(0.03, 0.06, len, 4), { matrix: _m4.clone(), color: twig });
-      // twig clusters at the branch tips with a little snow on top
-      b.add(G.ico(0.55 + rnd() * 0.35, 0), { x: cx * 2, y: y + cy * 2 + 0.2, z: cz * 2, sy: 0.8, color: crown, colorFn: snowCap(0.8) });
+      b.add(G.cyl(0.025, 0.055, len, 4), { matrix: _m4.clone(), color: twig });
+      _m4.compose(_v.set(cx * 2.05, y + cy * 2.05 + 0.25, cz * 2.05), _q, _s.set(0.42, 1.25, 0.42));
+      b.add(new THREE.OctahedronGeometry(0.7, 0), { matrix: _m4.clone(), color: crown, colorFn: snowCap(0.9) });
     }
-    b.add(G.ico(0.9, 0), { y: 8.9, sy: 1.3, color: crown, colorFn: snowCap(0.8) });
+    b.add(new THREE.OctahedronGeometry(0.6, 0), { y: 9.0, sx: 0.5, sy: 1.6, sz: 0.5, color: crown });
     return b.build();
   },
   rockGeometry(seed) {

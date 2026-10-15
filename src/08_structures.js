@@ -264,8 +264,9 @@ const Structures = {
       b.add(G.box(w * 0.9, 0.05, 0.3), { y: -2.95, z: 0.55, color: 0x9aa0a8 }); // foot rest
       for (const sd of [-1, 1]) b.add(G.box(0.05, 0.5, 0.05), { x: sd * w / 2, y: -2.2, z: 0.2, color: 0x9aa0a8 });
       if (T.hood) {
-        b.add(G.box(w + 0.1, 0.06, 0.9), { y: -1.42, z: 0.25, rx: 0.25, color: 0xff8a1f });
-        b.add(G.box(w + 0.1, 0.9, 0.06), { y: -1.82, z: 0.72, rx: 0.15, color: 0xffa64d });
+        // the bubble hood is tilted up while riding; drawn as its frame and a tinted top
+        b.add(G.box(w + 0.1, 0.05, 0.75), { y: -1.38, z: -0.05, rx: -0.55, color: 0xff8a1f });
+        for (const sd of [-1, 1]) b.add(G.box(0.05, 0.05, 0.9), { x: sd * (w / 2 + 0.05), y: -1.5, z: 0.1, rx: -0.5, color: 0xff8a1f });
       }
     }
     return b.build();
@@ -563,7 +564,7 @@ const Structures = {
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     g.setIndex(idx); g.computeVertexNormals();
-    const mat = new THREE.MeshStandardMaterial({ color: 0x24434d, roughness: 0.12, metalness: 0.1 });
+    const mat = new THREE.MeshStandardMaterial({ color: 0x24434d, roughness: 0.12, metalness: 0.1, side: THREE.DoubleSide });
     mat.onBeforeCompile = (sh) => {
       sh.uniforms.uTime = U.uTime;
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uTime;')

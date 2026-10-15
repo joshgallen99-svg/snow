@@ -4,7 +4,7 @@
 // ============================================================================
 const TerrainMesh = {
   CH: 128, chunks: [], group: null, material: null, nc: 0,
-  LODS: [{ seg: 64, dist: 300 }, { seg: 32, dist: 700 }, { seg: 16, dist: 1e9 }],
+  LODS: [{ seg: 64, dist: 300 }, { seg: 32, dist: 720 }],
   buildQueue: 0,
 
   init(scene) {
@@ -12,18 +12,56 @@ const TerrainMesh = {
     this.group.name = 'terrain';
     scene.add(this.group);
     this.material = this.makeMaterial();
+    this.farMaterial = this.makeMaterial();
+    Object.assign(this.farMaterial, { polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 4 });
     this.nc = Math.round((WORLD.half * 2) / this.CH);
     for (let j = 0; j < this.nc; j++) for (let i = 0; i < this.nc; i++) {
       const x0 = -WORLD.half + i * this.CH, z0 = -WORLD.half + j * this.CH;
-      this.chunks.push({ i, j, x0, z0, cx: x0 + this.CH / 2, cz: z0 + this.CH / 2, meshes: [null, null, null], lod: -1, want: 2, used: [0, 0, 0] });
+      this.chunks.push({ i, j, x0, z0, cx: x0 + this.CH / 2, cz: z0 + this.CH / 2, meshes: [null, null], lod: -1 });
     }
-    // build all coarse chunks up front so the whole mountain exists immediately
-    for (const c of this.chunks) this.ensure(c, 2);
+    // one coarse mesh for the whole mountain, sitting a hair below the detailed chunks
+    const far = new THREE.Mesh(this.makeGeometry({ x0: -WORLD.half, z0: -WORLD.half }, 384, WORLD.half * 2, false), this.farMaterial);
+    far.position.y = -0.8; far.receiveShadow = true; far.frustumCulled = false;
+    this.group.add(far); this.far = far;
+    this.buildOuter();
+  },
+  // the land beyond the play area, so views and the mountain cam never see an edge
+  buildOuter() {
+    const R = 6400, step = 64, n = Math.round((R * 2) / step) + 1, half = WORLD.half;
+    const pos = new Float32Array(n * n * 3), nrm = new Float32Array(n * n * 3), data = new Float32Array(n * n * 4), data2 = new Float32Array(n * n * 2);
+    const hAt = (x, z) => (Math.abs(x) <= half && Math.abs(z) <= half ? World.height(x, z) : baseHeight(x, z));
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const x = -R + i * step, z = -R + j * step, v = j * n + i;
+      const y = hAt(x, z);
+      pos.set([x, y, z], v * 3);
+      const hx = hAt(x + 16, z) - hAt(x - 16, z), hz = hAt(x, z + 16) - hAt(x, z - 16), l = Math.hypot(hx, 32, hz);
+      nrm.set([-hx / l, 32 / l, -hz / l], v * 3);
+      const inside = Math.abs(x) <= half && Math.abs(z) <= half;
+      const f = inside ? Scatter.forestAt(x, z) : clamp((0.75 * (1 - sstep(520, 640, y))) * sstep(-0.4, 0.2, fbm(noiseA, x / 400 + 4, z / 400, 3)) - (polyDist(RIVER, x, z, _tmp3) < 80 ? 0.6 : 0), 0, 1);
+      data.set([0, 0.5, f, 0], v * 4);
+    }
+    const idx = [];
+    for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) {
+      const x0 = -R + i * step, z0 = -R + j * step;
+      if (x0 >= -half && x0 + step <= half && z0 >= -half && z0 + step <= half) continue; // the world mesh covers this
+      const a = j * n + i, b = a + 1, c = a + n, d = c + 1;
+      idx.push(a, c, b, b, c, d);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+    g.setAttribute('aData', new THREE.BufferAttribute(data, 4));
+    g.setAttribute('aData2', new THREE.BufferAttribute(data2, 2));
+    g.setIndex(new THREE.Uint32BufferAttribute(idx, 1));
+    g.computeBoundingSphere();
+    const m = new THREE.Mesh(g, this.farMaterial);
+    m.position.y = -1.2; m.frustumCulled = false;
+    this.group.add(m); this.outer = m;
   },
 
-  makeGeometry(c, seg) {
-    const W = World, CH = this.CH, step = CH / seg, n = seg + 1;
-    const skirt = 4 * n;
+  makeGeometry(c, seg, size = this.CH, withSkirt = true) {
+    const W = World, CH = size, step = CH / seg, n = seg + 1;
+    const skirt = withSkirt ? 4 * n : 0;
     const vCount = n * n + skirt;
     const pos = new Float32Array(vCount * 3), nrm = new Float32Array(vCount * 3);
     const data = new Float32Array(vCount * 4), data2 = new Float32Array(vCount * 2);
@@ -49,10 +87,12 @@ const TerrainMesh = {
     const drop = 2 + step * 0.6;
     let v = n * n;
     const ring = [];
-    for (let i = 0; i < n; i++) ring.push([i, 0]);
-    for (let j = 0; j < n; j++) ring.push([n - 1, j]);
-    for (let i = n - 1; i >= 0; i--) ring.push([i, n - 1]);
-    for (let j = n - 1; j >= 0; j--) ring.push([0, j]);
+    if (withSkirt) {
+      for (let i = 0; i < n; i++) ring.push([i, 0]);
+      for (let j = 0; j < n; j++) ring.push([n - 1, j]);
+      for (let i = n - 1; i >= 0; i--) ring.push([i, n - 1]);
+      for (let j = n - 1; j >= 0; j--) ring.push([0, j]);
+    }
     const skirtStart = v;
     for (const [i, j] of ring) { writeVert(v++, gi0 + i * gstep, gj0 + j * gstep, -drop); }
     const idx = [];
@@ -71,7 +111,7 @@ const TerrainMesh = {
     g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
     g.setAttribute('aData', new THREE.BufferAttribute(data, 4));
     g.setAttribute('aData2', new THREE.BufferAttribute(data2, 2));
-    g.setIndex(idx);
+    g.setIndex(vCount > 65000 ? new THREE.Uint32BufferAttribute(idx, 1) : idx);
     g.computeBoundingSphere();
     return g;
   },
@@ -88,7 +128,7 @@ const TerrainMesh = {
     return c.meshes[lod];
   },
 
-  // pick LOD per chunk from camera distance; build at most a few chunks per frame
+  // detailed chunks near the camera, the single far mesh everywhere else
   update(cam, force = false) {
     let budget = force ? 999 : 3;
     const cx = cam.position.x, cz = cam.position.z, cy = cam.position.y;
@@ -96,21 +136,19 @@ const TerrainMesh = {
       const dx = Math.max(Math.abs(cx - c.cx) - this.CH / 2, 0), dz = Math.max(Math.abs(cz - c.cz) - this.CH / 2, 0);
       const dy = Math.max(0, cy - World.height(c.cx, c.cz) - 60);
       const d = Math.hypot(dx, dz, dy);
-      let want = 2;
-      if (d < this.LODS[0].dist) want = 0; else if (d < this.LODS[1].dist) want = 1;
-      if (want !== c.lod) {
-        let use = want;
-        if (!c.meshes[want]) {
-          if (budget > 0) { this.ensure(c, want); budget--; } else use = c.meshes[c.lod] ? c.lod : 2;
-        }
-        if (use !== c.lod) {
-          if (c.lod >= 0 && c.meshes[c.lod]) c.meshes[c.lod].visible = false;
-          this.ensure(c, use).visible = true;
-          c.lod = use;
-        }
+      const want = d < this.LODS[0].dist ? 0 : d < this.LODS[1].dist ? 1 : -1;
+      if (want === c.lod) continue;
+      let use = want;
+      if (want >= 0 && !c.meshes[want]) {
+        if (budget > 0) { this.ensure(c, want); budget--; }
+        else use = c.lod >= 0 && c.meshes[c.lod] ? c.lod : (c.meshes[1] ? 1 : -1);
       }
+      if (use === c.lod) continue;
+      if (c.lod >= 0 && c.meshes[c.lod]) c.meshes[c.lod].visible = false;
+      if (use >= 0) this.ensure(c, use).visible = true;
+      c.lod = use;
     }
-    // free far fine meshes to cap memory
+    // free fine meshes we have moved away from
     for (const c of this.chunks) {
       for (let l = 0; l < 2; l++) {
         const m = c.meshes[l];
@@ -119,11 +157,6 @@ const TerrainMesh = {
         }
       }
     }
-  },
-  // rebuild everything (after terrain edits)
-  rebuildAll() {
-    for (const c of this.chunks) for (let l = 0; l < 3; l++) if (c.meshes[l]) { this.group.remove(c.meshes[l]); c.meshes[l].geometry.dispose(); c.meshes[l] = null; }
-    for (const c of this.chunks) { c.lod = -1; this.ensure(c, 2); }
   },
 
   makeMaterial() {
@@ -163,7 +196,7 @@ const TerrainMesh = {
         // forest floor: shaded snow and needle litter, and a dark mass from afar
         float far = smoothstep(250.0, 1400.0, camD);
         col = mix(col, vec3(0.62, 0.68, 0.74), forestA * 0.35 * (1.0 - far));
-        col = mix(col, vec3(0.13, 0.19, 0.20), forestA * (0.08 + 0.5 * far) * (1.0 - rock));
+        col = mix(col, vec3(0.05, 0.09, 0.09), clamp(forestA * 1.25, 0.0, 1.0) * (0.1 + 0.78 * far) * (1.0 - rock));
         // plowed roads
         float tracks = smoothstep(0.35, 0.5, abs(fract(q * 0.45) - 0.5));
         col = mix(col, mix(vec3(0.42, 0.42, 0.43), vec3(0.30, 0.30, 0.31), tracks * 0.7), roadA);
@@ -192,7 +225,7 @@ const TerrainMesh = {
           float camD2 = length(vWPos - cameraPosition);
           float th1 = vData2.x; vec2 dT = vec2(cos(th1), sin(th1)); vec2 dN = vec2(-dT.y, dT.x);
           float q2 = dot(vWPos.xz, dN);
-          float cord = sin(q2 * 6.2831 / 0.11) * vData.x * (1.0 - smoothstep(6.0, 28.0, camD2)) * 0.35;
+          float cord = sin(q2 * 6.2831 / 0.11) * vData.x * (1.0 - smoothstep(5.0, 22.0, camD2)) * 0.2;
           vec2 rp = vWPos.xz * vec2(0.9, 0.35);
           float rip = (vnoise(rp) - 0.5) * (1.0 - vData.x) * (0.25 + vData.y * 0.4) * (1.0 - smoothstep(20.0, 90.0, camD2));
           vec3 pw = vec3(dN.x, 0.0, dN.y) * cord + vec3(0.6, 0.0, 0.3) * rip;

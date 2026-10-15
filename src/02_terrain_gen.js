@@ -14,7 +14,7 @@ const GULLY_FEATURES = [
   // the west ravine, strictly off limits
   { pts: [[-330, -470], [-470, -250], [-600, 0], [-720, 260], [-830, 520], [-930, 780], [-1010, 1000], [-1060, 1220], [-1080, 1360]], depth: 58, w: 46, wall: 0 },
 ];
-const RIVER = [[-1600, 1340], [-1080, 1372], [-600, 1350], [-150, 1318], [300, 1262], [800, 1196], [1250, 1150], [1600, 1120]];
+const RIVER = [[-6400, 1900], [-4200, 1650], [-2600, 1420], [-1600, 1340], [-1080, 1372], [-600, 1350], [-150, 1318], [300, 1262], [800, 1196], [1250, 1150], [1600, 1120], [2600, 1180], [4200, 1500], [6400, 1700]];
 const BOWLS = [{ x: -70, z: -700, r: 240, depth: 24 }];
 
 function polyDist(pts, x, z, tmp) {
@@ -72,6 +72,9 @@ function baseCoarse(x, z) {
     if (d < 60) h -= 5.5 * (1 - sstep(6, 26, d)) + 1.5 * (1 - sstep(20, 60, d));
   }
   h += fbm(noiseB, x / 140, z / 140, 3) * (1.8 + 7 * alt);
+  // beyond the resort: rolling forested hills and the far side of the valley
+  const out = sstep(1300, 2600, Math.max(Math.abs(x), Math.abs(z) - (z > 0 ? 300 : 0)));
+  if (out > 0) h += out * ((fbm(noiseA, x / 1100 + 5, z / 1100, 4) * 0.5 + 0.5) * 230 + (ridged(noiseC, x / 520 + 3, z / 520, 4) - 0.4) * 150) + sstep(2400, 5200, z) * 180;
   return h + 35;
 }
 function baseFine(x, z, h) {
