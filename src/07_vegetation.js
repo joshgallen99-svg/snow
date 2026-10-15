@@ -76,6 +76,7 @@ const Vegetation = {
       uniforms: { uLodCam: U.uLodCam, uLodR: U.uLodR },
       vertexHead: 'uniform vec3 uLodCam; uniform float uLodR;',
       vertexBegin: this.lodChunk(near),
+      fragColor: DETAIL.needles,
     });
     return mat;
   },
@@ -146,7 +147,7 @@ const Vegetation = {
     }
     // rocks
     const rockGeos = [this.rockGeometry(1), this.rockGeometry(2), this.rockGeometry(3)];
-    const rockMat = stdMat({ roughness: 0.95 }, { key: 'rock' });
+    const rockMat = stdMat({ roughness: 0.95 }, { key: 'rock', fragColor: DETAIL.rock });
     const lists = [[], [], []];
     Scatter.rocks.forEach((r, i) => lists[Math.floor(r.seed * 3) % 3].push(r));
     lists.forEach((list, v) => {

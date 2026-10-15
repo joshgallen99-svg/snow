@@ -88,6 +88,7 @@ const Sound = {
     for (let i = 0; i < 4; i++) this.burstNoise(t + i * 0.13 + Math.random() * 0.05, 'lowpass', 700, 0.8, 0.45 - i * 0.08, 0.3);
     this.tone(t, 'sine', 70, 35, 0.5, 0.35);
   },
+  brush() { if (!this.ready) return; const t = this.ctx.currentTime; this.burstNoise(t, 'lowpass', 900, 0.6, 0.22, 0.45); this.burstNoise(t + 0.05, 'highpass', 3500, 0.5, 0.05, 0.3); },
   bump() { if (!this.ready) return; const t = this.ctx.currentTime; this.burstNoise(t, 'bandpass', 900, 1.2, 0.25, 0.12); },
   pop() { if (!this.ready) return; const t = this.ctx.currentTime; this.burstNoise(t, 'bandpass', 1500, 1.5, 0.25, 0.08); this.tone(t, 'sine', 220, 120, 0.12, 0.08); },
   grind(on) {

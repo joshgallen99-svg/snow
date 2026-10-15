@@ -81,7 +81,10 @@ const World = {
           const bx = cx + c.tx * f.len * 0.5, bz = cz + c.tz * f.len * 0.5;
           const h = f.k === 'box' ? 0.55 : (f.h || 0.9);
           const ay = this.height(ax, az) + h, by = this.height(bx, bz) + h;
-          this.grinds.push({ kind: f.k, ax, az, ay, bx, bz, by, dx: c.tx, dz: c.tz, len: f.len, w: f.k === 'box' ? 0.5 : 0.07, h, run: run.index });
+          const gr = { kind: f.k, ax, az, ay, bx, bz, by, dx: c.tx, dz: c.tz, len: f.len, w: f.k === 'box' ? 0.5 : 0.07, h, run: run.index };
+          this.grinds.push(gr);
+          // solid sides: you get onto a box from its ramp and onto a rail with an ollie
+          this.addBoxCollider(cx, cz, f.len / 2, gr.w + 0.04, Math.atan2(-c.tz, c.tx), Math.max(ay, by) - 0.06, f.k, gr);
         }
       }
     }
@@ -135,7 +138,36 @@ const World = {
     return null;
   },
 
-  // ---- colliders (circles in xz with a top height) -------------------------
+  // ---- colliders: circles or oriented boxes in xz, each with a top height ----
+  // box rotation follows three.js rotation.y: local x maps to world (cos r, -sin r)
+  addBoxCollider(x, z, hw, hd, rot, top, kind, ref) {
+    const c = this.addCollider(x, z, Math.hypot(hw, hd), top, kind, ref);
+    Object.assign(c, { box: true, hw, hd, cr: Math.cos(rot), sr: Math.sin(rot) });
+    return c;
+  },
+  // push needed to move a circle of radius R at (px, pz) out of collider c, with the contact normal
+  colliderPush(c, px, pz, R) {
+    const dx = px - c.x, dz = pz - c.z;
+    if (!c.box) {
+      const d = Math.hypot(dx, dz), min = c.r + R;
+      if (d >= min) return null;
+      const nx = d > 1e-6 ? dx / d : 1, nz = d > 1e-6 ? dz / d : 0;
+      return { x: nx * (min - d), z: nz * (min - d), nx, nz, depth: min - d };
+    }
+    const lx = dx * c.cr - dz * c.sr, lz = dx * c.sr + dz * c.cr;
+    const qx = clamp(lx, -c.hw, c.hw), qz = clamp(lz, -c.hd, c.hd);
+    let ex = lx - qx, ez = lz - qz, d = Math.hypot(ex, ez), nlx, nlz, depth;
+    if (d > 1e-6) {
+      if (d >= R) return null;
+      nlx = ex / d; nlz = ez / d; depth = R - d;
+    } else {
+      // inside the box: leave by the nearest face
+      const px2 = c.hw - Math.abs(lx), pz2 = c.hd - Math.abs(lz);
+      if (px2 < pz2) { nlx = Math.sign(lx) || 1; nlz = 0; depth = px2 + R; } else { nlx = 0; nlz = Math.sign(lz) || 1; depth = pz2 + R; }
+    }
+    const nx = nlx * c.cr + nlz * c.sr, nz = -nlx * c.sr + nlz * c.cr;
+    return { x: nx * depth, z: nz * depth, nx, nz, depth };
+  },
   addCollider(x, z, r, top, kind, ref) {
     const c = { x, z, r, top, kind, ref };
     const idx = this.colliders.push(c) - 1;

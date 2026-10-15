@@ -163,6 +163,29 @@ const Sky = {
     scene.add(this.snowPts);
   },
 
+  // a small captured sky for reflections on goggles, helmets, boards and steel
+  makeEnv(renderer) {
+    const sc = new THREE.Scene();
+    const g = new THREE.SphereGeometry(50, 48, 24);
+    const pos = g.attributes.position, col = [];
+    const zen = new THREE.Color(0x3f7fd8), hor = new THREE.Color(0xd8e6f6), gnd = new THREE.Color(0xeef2f7), shade = new THREE.Color(0x9aa8bc);
+    for (let i = 0; i < pos.count; i++) {
+      const y = pos.getY(i) / 50;
+      const c = y > 0 ? hor.clone().lerp(zen, Math.pow(y, 0.6)) : gnd.clone().lerp(shade, Math.min(1, -y * 1.4));
+      col.push(c.r, c.g, c.b);
+    }
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    sc.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
+    const sun = new THREE.Mesh(new THREE.SphereGeometry(3, 12, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(8, 7.6, 7) }));
+    sun.position.set(20, 30, 25); sc.add(sun);
+    // distant ridge line so reflections have a horizon
+    const ridge = new THREE.Mesh(new THREE.CylinderGeometry(48, 48, 6, 48, 1, true), new THREE.MeshBasicMaterial({ color: 0x2f3c4a, side: THREE.BackSide }));
+    ridge.position.y = 1; sc.add(ridge);
+    const pm = new THREE.PMREMGenerator(renderer);
+    const rt = pm.fromScene(sc, 0.03);
+    pm.dispose();
+    return rt.texture;
+  },
   setWeather(state, snap = false) {
     const T = this.weather.target;
     this.weather.state = state;

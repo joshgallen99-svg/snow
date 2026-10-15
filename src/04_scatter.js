@@ -121,12 +121,7 @@ const Scatter = {
         const idx = j * N + i;
         World.H[idx] = lerp(World.H[idx], b.y, t);
       }
-      const c = Math.cos(b.rot), s = Math.sin(b.rot);
-      const n = Math.max(1, Math.round(b.w / b.d));
-      for (let q = 0; q < n; q++) {
-        const o = (q + 0.5) / n - 0.5;
-        World.addCollider(b.x + c * o * b.w, b.z - s * o * b.w, b.d * 0.62, b.y + b.floors * 3.2 + 4, 'building', b);
-      }
+      World.addBoxCollider(b.x, b.z, b.w / 2 + 0.35, b.d / 2 + 0.35, b.rot, b.y + b.floors * 3.2 + 4, 'building', b);
     }
   },
 

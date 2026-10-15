@@ -212,6 +212,7 @@ const VILLAGE = { center: [-640, 1080], east: [905, 660] };
 
 // Gear locker. cost = snowflake tokens needed to unlock.
 const BOARDS = [
+  { id: 'blackout', name: 'Blackout',   cost: 0,  top: ['#141518', '#d32424'], pattern: 'blackout' },
   { id: 'birch',   name: 'Birch',       cost: 0,  top: ['#f2ede4', '#1e2a38'], pattern: 'stripe' },
   { id: 'ember',   name: 'Ember',       cost: 0,  top: ['#ff6b35', '#2b1d3a'], pattern: 'chevron' },
   { id: 'glacier', name: 'Glacier',     cost: 6,  top: ['#bfe6ff', '#1f5d8c'], pattern: 'facets' },
@@ -222,6 +223,7 @@ const BOARDS = [
   { id: 'kaze',    name: 'Kaze Pro',    cost: 55, top: ['#f4f4f4', '#c0392b'], pattern: 'circle' },
 ];
 const JACKETS = [
+  { id: 'onyx',      name: 'Onyx',      cost: 0,  c: '#17181b' },
   { id: 'tangerine', name: 'Tangerine', cost: 0,  c: '#ff7a2f' },
   { id: 'glacier',   name: 'Glacier',   cost: 0,  c: '#3f86d8' },
   { id: 'moss',      name: 'Moss',      cost: 4,  c: '#5d7d3a' },
@@ -232,6 +234,7 @@ const JACKETS = [
   { id: 'mint',      name: 'Mint',      cost: 46, c: '#7fe0c0' },
 ];
 const PANTS = [
+  { id: 'jet',      name: 'Jet',      cost: 0,  c: '#141518' },
   { id: 'charcoal', name: 'Charcoal', cost: 0,  c: '#2c3036' },
   { id: 'sand',     name: 'Sand',     cost: 0,  c: '#c9b48e' },
   { id: 'navy',     name: 'Navy',     cost: 8,  c: '#1f2d4d' },
@@ -240,9 +243,18 @@ const PANTS = [
   { id: 'rust',     name: 'Rust',     cost: 38, c: '#8c3b1e' },
 ];
 const HELMETS = [
+  { id: 'black', name: 'Matte Black', cost: 0, c: '#1b1d21' },
   { id: 'white', name: 'White', cost: 0,  c: '#eef0f2' },
-  { id: 'black', name: 'Black', cost: 0,  c: '#1b1d21' },
   { id: 'red',   name: 'Red',   cost: 8,  c: '#c43a31' },
   { id: 'teal',  name: 'Teal',  cost: 18, c: '#1f8a8a' },
   { id: 'gold',  name: 'Gold',  cost: 36, c: '#d8a93a' },
+];
+// goggle lenses: lens tint, a faint glow so the mirror reads in shadow, and an accent for trims
+const GOGGLES = [
+  { id: 'red',    name: 'Red Mirror',   cost: 0,  lens: '#e01d1a', glow: '#3a0504', frameAccent: '#d32424', c: '#e01d1a' },
+  { id: 'blue',   name: 'Ice Mirror',   cost: 0,  lens: '#2f7de0', glow: '#06183a', frameAccent: '#2f7de0', c: '#2f7de0' },
+  { id: 'gold',   name: 'Gold Mirror',  cost: 8,  lens: '#e8b23a', glow: '#3a2a05', frameAccent: '#e8b23a', c: '#e8b23a' },
+  { id: 'green',  name: 'Emerald',      cost: 18, lens: '#2fbf6a', glow: '#063a1c', frameAccent: '#2fbf6a', c: '#2fbf6a' },
+  { id: 'smoke',  name: 'Smoke',        cost: 26, lens: '#2a2d33', glow: '#08090b', frameAccent: '#8a8f98', c: '#2a2d33' },
+  { id: 'violet', name: 'Violet Night', cost: 40, lens: '#8a3be0', glow: '#1c0633', frameAccent: '#8a3be0', c: '#8a3be0' },
 ];

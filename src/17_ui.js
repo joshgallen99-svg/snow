@@ -53,7 +53,7 @@ const UI = {
 
   // ---- locker --------------------------------------------------------------------
   renderLocker() {
-    const tabs = [['boards', 'Boards', BOARDS, 'board'], ['jackets', 'Jackets', JACKETS, 'jacket'], ['pants', 'Pants', PANTS, 'pants'], ['helmets', 'Helmets', HELMETS, 'helmet']];
+    const tabs = [['boards', 'Boards', BOARDS, 'board'], ['jackets', 'Jackets', JACKETS, 'jacket'], ['pants', 'Pants', PANTS, 'pants'], ['helmets', 'Helmets', HELMETS, 'helmet'], ['goggles', 'Goggles', GOGGLES, 'goggles']];
     const flakes = Game.flakeCount();
     $('lkFlakes').textContent = flakes;
     $('lkTabs').innerHTML = tabs.map(([id, label]) => `<button class="tab" role="tab" aria-selected="${id === this.lockerTab}" data-tab="${id}">${label}</button>`).join('');

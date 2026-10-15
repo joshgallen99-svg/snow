@@ -159,17 +159,55 @@ const TerrainMesh = {
     }
   },
 
-  makeMaterial() {
+  // overlay = the deformable fresh-snow layer near the rider (see 12b_snow.js)
+  makeMaterial(overlay = false) {
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0 });
     const uni = { uSunDir: U.uSunDir, uSunColor: U.uSunColor, uMapMode: U.uMapMode, uNight: U.uNight };
+    if (overlay) Object.assign(uni, Snow.uniforms);
+    const overlayHead = /* glsl */`
+      uniform sampler2D uHMap, uSMap, uDMap, uComp;
+      uniform vec2 uOrigin; uniform float uSize, uWN, uWHalf, uWRes, uCompRes;
+      float hAt(vec2 w) {
+        vec2 g = (w + uWHalf) / uWRes; vec2 i = floor(g); vec2 f = g - i;
+        ivec2 ii = ivec2(clamp(i, vec2(0.0), vec2(uWN - 2.0)));
+        float a = texelFetch(uHMap, ii, 0).r, b = texelFetch(uHMap, ii + ivec2(1, 0), 0).r;
+        float c = texelFetch(uHMap, ii + ivec2(0, 1), 0).r, d = texelFetch(uHMap, ii + ivec2(1, 1), 0).r;
+        return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+      }
+      vec2 wUv(vec2 w) { return ((w + uWHalf) / uWRes + 0.5) / uWN; }
+      // fresh snow depth over the ground, pressed down where the compaction map says so
+      float snowDepth(vec2 loc, vec2 w, out float comp) {
+        vec4 s = texture(uSMap, wUv(w));
+        float d = mix(mix(0.30, 0.13, s.r), 0.62, s.g * (1.0 - s.r)) * (1.0 - s.a);
+        vec2 l = abs(loc) / (uSize * 0.5);
+        d *= 1.0 - smoothstep(0.62, 0.97, max(l.x, l.y));
+        vec2 cuv = loc / uSize + 0.5;
+        vec2 cg = texture(uComp, cuv).rg;
+        // a small blur keeps the groove walls smooth between vertices
+        float bp = 1.4 / uCompRes, px = 2.6 / uCompRes;
+        float c4 = texture(uComp, cuv + vec2(bp, bp)).r + texture(uComp, cuv + vec2(-bp, bp)).r + texture(uComp, cuv + vec2(bp, -bp)).r + texture(uComp, cuv + vec2(-bp, -bp)).r;
+        float cs = (cg.r * 2.0 + c4) / 6.0;
+        float nb = max(max(texture(uComp, cuv + vec2(px, 0.0)).r, texture(uComp, cuv - vec2(px, 0.0)).r),
+                       max(texture(uComp, cuv + vec2(0.0, px)).r, texture(uComp, cuv - vec2(0.0, px)).r));
+        comp = cs;
+        d *= 1.0 - cg.g * 0.8; // tree wells
+        // in bottomless powder the board leaves a little snow under it; the push-out piles up as a lip
+        float floorKeep = smoothstep(0.35, 0.62, d) * 0.12;
+        return d * (1.0 - cs * (1.0 - floorKeep) + max(0.0, nb - cs) * 0.5);
+      }
+      float snowY(vec2 loc, out float comp) { vec2 w = loc + uOrigin; return hAt(w) + snowDepth(loc, w, comp); }
+    `;
     patchStandard(mat, {
-      key: 'terrain',
+      key: overlay ? 'terrainSnow' : 'terrain',
       uniforms: uni,
-      vertexHead: 'attribute vec4 aData; attribute vec2 aData2; varying vec4 vData; varying vec2 vData2;',
-      vertexTail: 'vData = aData; vData2 = aData2;',
+      vertexHead: overlay
+        ? 'varying vec4 vData; varying vec2 vData2; varying float vComp; varying vec2 vCuv; varying float vDepth;' + overlayHead
+        : 'attribute vec4 aData; attribute vec2 aData2; varying vec4 vData; varying vec2 vData2; varying float vComp; varying vec2 vCuv; varying float vDepth;',
+      vertexTail: overlay ? '' : 'vData = aData; vData2 = aData2; vComp = 0.0; vCuv = vec2(0.0); vDepth = 0.0;',
       fragHead: /* glsl */`
-        varying vec4 vData; varying vec2 vData2;
+        varying vec4 vData; varying vec2 vData2; varying float vComp; varying vec2 vCuv; varying float vDepth;
         uniform vec3 uSunDir; uniform vec3 uSunColor; uniform float uMapMode; uniform float uNight;
+        ${overlay ? 'uniform sampler2D uComp; uniform float uCompRes, uSize;' : ''}
         float th(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
         float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
           return mix(mix(th(i), th(i+vec2(1,0)), f.x), mix(th(i+vec2(0,1)), th(i+vec2(1,1)), f.x), f.y); }
@@ -183,19 +221,27 @@ const TerrainMesh = {
         // groomed snow is a touch warmer and smoother, powder a touch bluer and brighter
         snow = mix(snow, vec3(0.90, 0.92, 0.95), groomA * 0.6);
         snow = mix(snow, vec3(0.92, 0.95, 1.0), powderA * 0.3);
+        // soft drifts: a few percent of albedo variation
+        snow *= 0.97 + 0.05 * vnoise(vWPos.xz * 0.21) + 0.02 * vnoise(vWPos.xz * 1.7);
         // groomer passes: broad strips along the run
         float th0 = vData2.x; vec2 dirT = vec2(cos(th0), sin(th0)); vec2 dirN = vec2(-dirT.y, dirT.x);
         float q = dot(vWPos.xz, dirN);
         float strip = th(vec2(floor(q / 4.6), floor(dot(vWPos.xz, dirT) / 60.0)));
         snow *= 1.0 - groomA * (0.035 * strip) * (1.0 - smoothstep(200.0, 500.0, camD));
-        // rock on steep faces, with a little strata
+        // packed snow in a groove is denser and a little blue
+        snow = mix(snow, snow * vec3(0.84, 0.89, 0.98), clamp(vComp, 0.0, 1.0) * 0.7);
+        // rock on steep faces, with strata and lichen-dark patches
         float rn = vnoise(vWPos.xz * 0.15) * 0.08 + vnoise(vWPos.xz * 0.8) * 0.04;
         float rock = smoothstep(0.36, 0.46, slope + rn) * (1.0 - groomA);
-        vec3 rockC = mix(vec3(0.20, 0.19, 0.19), vec3(0.32, 0.30, 0.28), fract(vWPos.y * 0.21 + rn * 4.0) * 0.6);
+        float strata = fract(vWPos.y * 0.21 + rn * 4.0);
+        vec3 rockC = mix(vec3(0.20, 0.19, 0.19), vec3(0.33, 0.31, 0.29), strata * 0.6) * (0.85 + 0.3 * vnoise(vWPos.xz * 2.3 + vWPos.y));
+        rockC = mix(rockC, vec3(0.86, 0.9, 0.96), smoothstep(0.55, 0.85, vnoise(vWPos.xz * 1.1 + 3.0)) * 0.55); // snow caught on ledges
         vec3 col = mix(snow, rockC, rock);
-        // forest floor: shaded snow and needle litter, and a dark mass from afar
+        // forest floor: shaded snow, needle and twig litter close up, a dark mass from afar
         float far = smoothstep(250.0, 1400.0, camD);
         col = mix(col, vec3(0.62, 0.68, 0.74), forestA * 0.35 * (1.0 - far));
+        float litter = step(0.93, th(floor(vWPos.xz * 7.0))) * smoothstep(0.25, 0.7, forestA) * (1.0 - smoothstep(8.0, 30.0, camD)) * (1.0 - clamp(vComp, 0.0, 1.0));
+        col = mix(col, vec3(0.28, 0.22, 0.18), litter * 0.55);
         col = mix(col, vec3(0.05, 0.09, 0.09), clamp(forestA * 1.25, 0.0, 1.0) * (0.1 + 0.78 * far) * (1.0 - rock));
         // plowed roads
         float tracks = smoothstep(0.35, 0.5, abs(fract(q * 0.45) - 0.5));
@@ -203,7 +249,7 @@ const TerrainMesh = {
         diffuseColor.rgb = col;
       `,
       fragTail: /* glsl */`
-        // sun glitter on fresh snow
+        // sun glitter on fresh snow (packed snow doesn't sparkle)
         {
           vec3 V = normalize(cameraPosition - vWPos);
           vec3 Hh = normalize(uSunDir + V);
@@ -211,29 +257,67 @@ const TerrainMesh = {
           float rnd = th(cellP.xz + cellP.y * 7.13 + floor(V.xz * 6.0));
           float spec = pow(max(dot(normalize(vWNrm), Hh), 0.0), 18.0);
           float spark = step(0.9965, rnd) * spec * (1.0 - smoothstep(10.0, 70.0, length(vWPos - cameraPosition)));
-          outgoingLight += uSunColor * spark * 3.5 * (1.0 - vData.w) * max(uSunDir.y, 0.0);
+          outgoingLight += uSunColor * spark * 3.5 * (1.0 - vData.w) * (1.0 - clamp(vComp, 0.0, 1.0)) * max(uSunDir.y, 0.0);
         }
       `,
     });
-    // normal perturbation for corduroy and wind ripples goes in after normals are known
     const prev = mat.onBeforeCompile;
     mat.onBeforeCompile = (sh, r) => {
       prev(sh, r);
+      if (overlay) {
+        // the overlay builds its own position and normal from the world maps
+        sh.vertexShader = sh.vertexShader.replace('#include <beginnormal_vertex>', /* glsl */`
+          vec2 sLoc = position.xz;
+          float sComp, sTmp;
+          float sY = snowY(sLoc, sComp);
+          float e = 0.12;
+          float yx1 = snowY(sLoc + vec2(e, 0.0), sTmp), yx0 = snowY(sLoc - vec2(e, 0.0), sTmp);
+          float yz1 = snowY(sLoc + vec2(0.0, e), sTmp), yz0 = snowY(sLoc - vec2(0.0, e), sTmp);
+          vec3 objectNormal = normalize(vec3(yx0 - yx1, 2.0 * e, yz0 - yz1));
+          vec2 sW = sLoc + uOrigin;
+          vec3 snowPos = vec3(sW.x, sY, sW.y);
+          vData = texture(uSMap, wUv(sW));
+          vData.x *= 1.0 - sComp;
+          vec2 dd = texelFetch(uDMap, ivec2(clamp(floor((sW + uWHalf) / uWRes + 0.5), vec2(0.0), vec2(uWN - 1.0))), 0).rg;
+          vData2 = vec2(dd.x * 3.14159265, dd.y);
+          vComp = sComp; vCuv = sLoc / uSize + 0.5; vDepth = sY - hAt(sW);
+          #ifdef USE_TANGENT
+            vec3 objectTangent = vec3(tangent.xyz);
+          #endif
+        `).replace('#include <begin_vertex>', 'vec3 transformed = snowPos;');
+      }
       sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_maps>', /* glsl */`
         #include <normal_fragment_maps>
         {
           float camD2 = length(vWPos - cameraPosition);
+          float near = 1.0 - smoothstep(14.0, 40.0, camD2);
           float th1 = vData2.x; vec2 dT = vec2(cos(th1), sin(th1)); vec2 dN = vec2(-dT.y, dT.x);
           float q2 = dot(vWPos.xz, dN);
           float cord = sin(q2 * 6.2831 / 0.11) * vData.x * (1.0 - smoothstep(5.0, 22.0, camD2)) * 0.2;
+          // wind ripples (sastrugi) on ungroomed snow, stretched across the wind
           vec2 rp = vWPos.xz * vec2(0.9, 0.35);
-          float rip = (vnoise(rp) - 0.5) * (1.0 - vData.x) * (0.25 + vData.y * 0.4) * (1.0 - smoothstep(20.0, 90.0, camD2));
-          vec3 pw = vec3(dN.x, 0.0, dN.y) * cord + vec3(0.6, 0.0, 0.3) * rip;
+          float rip = (vnoise(rp) - 0.5 + (vnoise(rp * 3.1) - 0.5) * 0.4) * (1.0 - vData.x) * (0.25 + vData.y * 0.4) * (1.0 - smoothstep(20.0, 90.0, camD2));
+          // fine grain: small lumps you only see up close
+          float g1 = vnoise(vWPos.xz * 6.0) - 0.5, g2 = vnoise(vWPos.zx * 6.0 + 11.0) - 0.5;
+          vec3 pw = vec3(dN.x, 0.0, dN.y) * cord + vec3(0.6, 0.0, 0.3) * rip + vec3(g1, 0.0, g2) * 0.12 * near * (1.0 - vData.w);
+          ${overlay ? `
+          // crisp groove walls from the compaction map
+          {
+            float cpx = 1.0 / uCompRes;
+            float cx1 = texture(uComp, vCuv + vec2(cpx, 0.0)).r, cx0 = texture(uComp, vCuv - vec2(cpx, 0.0)).r;
+            float cz1 = texture(uComp, vCuv + vec2(0.0, cpx)).r, cz0 = texture(uComp, vCuv - vec2(0.0, cpx)).r;
+            float k = vDepth / max(vComp < 0.99 ? (1.0 - vComp) : 1.0, 0.05) / (2.0 * uSize * cpx);
+            pw += vec3(cx1 - cx0, 0.0, cz1 - cz0) * clamp(k, 0.0, 6.0);
+          }` : ''}
           normal = normalize(normal + (viewMatrix * vec4(pw, 0.0)).xyz);
         }
       `).replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-        roughnessFactor = mix(0.92, 0.72, vData.x); roughnessFactor = mix(roughnessFactor, 0.45, vData.w);`);
+        roughnessFactor = mix(0.92, 0.72, vData.x); roughnessFactor = mix(roughnessFactor, 0.45, vData.w);
+        roughnessFactor = mix(roughnessFactor, 0.62, clamp(vComp, 0.0, 1.0));`);
     };
+    if (overlay) {
+      mat.polygonOffset = true; mat.polygonOffsetFactor = -1; mat.polygonOffsetUnits = -2;
+    }
     return mat;
   },
 };

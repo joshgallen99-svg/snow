@@ -9,7 +9,7 @@ const Game = {
 
   defaults() {
     return {
-      done: {}, best: {}, tokens: [], gear: { board: 'birch', jacket: 'tangerine', pants: 'charcoal', helmet: 'white' },
+      v: 2, done: {}, best: {}, tokens: [], gear: { board: 'blackout', jacket: 'onyx', pants: 'jet', helmet: 'black', goggles: 'red' },
       settings: { music: 0.5, sfx: 0.8, quality: 'high', time: 'cycle', weather: 'auto', stance: 1, cine: true, ghost: false, unlockAll: false },
       ghosts: {},
     };
@@ -20,6 +20,13 @@ const Game = {
     const d = this.defaults();
     this.save = Object.assign(d, s || {});
     this.save.gear = Object.assign(d.gear, (s && s.gear) || {});
+    // first save format: move the old starter outfit onto the new all-black kit with red goggles
+    if (s && !s.v) {
+      const g = this.save.gear;
+      if (g.jacket === 'tangerine' && g.pants === 'charcoal' && g.helmet === 'white' && g.board === 'birch') Object.assign(g, d.gear);
+      g.goggles = g.goggles || 'red';
+      this.save.v = 2;
+    }
     this.save.settings = Object.assign(this.defaults().settings, (s && s.settings) || {});
     this.settings = this.save.settings;
     FX.collected = new Set(this.save.tokens);
@@ -73,14 +80,20 @@ const Game = {
     const scLabels = ['Plowing the roads', 'Building the village', 'Mapping the forest', 'Planting the birch and fir', 'Placing rocks and snowflakes'];
     for (let i = 0; i < sc.length; i++) await step(scLabels[i], sc[i]);
     await step('Laying the snow', () => TerrainMesh.init(this.scene));
+    await step('Dumping fresh powder', () => Snow.init(this.scene, this.settings.quality));
     await step('Growing the forest', () => Vegetation.init(this.scene));
     await step('Stringing the lift cables', () => Structures.init(this.scene));
     await step('Lighting the sky', () => { Sky.init(this.scene); FX.init(this.scene); });
     await step('Printing the trail map', () => MapView.init(this.scene));
+    await step('Polishing goggles', () => {
+      ENV_MAP = Sky.makeEnv(renderer);
+      for (const m of [Structures.metalMat]) { m.envMap = ENV_MAP; m.envMapIntensity = 0.45; m.needsUpdate = true; }
+    });
     await step('Waxing your board', () => {
       this.rider = new RiderModel(); this.scene.add(this.rider.group);
       this.ghostModel = new RiderModel({ ghost: true }); this.scene.add(this.ghostModel.group); this.ghostModel.group.visible = false;
       this.applyGear();
+      this.rider.applyEnv();
       Post.init(renderer);
     });
     this.onResize(); addEventListener('resize', () => this.onResize());
@@ -178,6 +191,7 @@ const Game = {
     this.lodgeSpot = p;
     Player.reset(p.x, p.z, Math.atan2(side.x, side.z));
     Player.frozen = true;
+    if (Snow.mesh) { Snow.recenter(p.x, p.z); Snow.stampRect(p.x, p.z, 1, 0, 0.8, 0.16, 1); for (let k = 1; k < 7; k++) Snow.stampCircle(p.x + k * 0.55, p.z + Math.sin(k) * 0.3, 0.17, 0.7); }
   },
   setLodgeCam(snap) {
     Cam.setMode('lodge', snap ? 0.01 : 1.2);
@@ -305,6 +319,7 @@ const Game = {
     const c = World.pathAt(rd, 4);
     Player.frozen = false;
     Player.reset(c.x, c.z, Math.atan2(c.tx, c.tz), mode === 'tt' ? 0 : 3);
+    Snow.recenter(c.x, c.z, true);
     Cam.setMode('chase', 0.9); Cam.dir.set(c.tx, 0, c.tz);
     const gates = mode === 'tt' ? Scatter.gatesByRun[run.id] : [];
     this.session = {
@@ -382,6 +397,15 @@ const Game = {
         FX.burst(Player.pos.x, Player.pos.y, Player.pos.z, 50, 4, { s0: 0.4, s1: 1.8, life: 1.4, vx: Player.vel.x * 0.4, vz: Player.vel.z * 0.4 });
         if (Cam.mode === 'cine') Cam.setMode('chase', 0.5);
       } else if (e.type === 'bump') { if (e.into > 2) Sound.bump(); }
+      else if (e.type === 'brush') {
+        // snow shaken off the branches falls around you
+        const t = e.tree, n = t.type ? 14 : 34;
+        for (let k = 0; k < n; k++) {
+          const a = Math.random() * TAU, r = Math.random() * (t.type ? 1.2 : 2.2) * t.s, h = t.y + (1.5 + Math.random() * 6) * t.s;
+          FX.spawn(t.x + Math.cos(a) * r, h, t.z + Math.sin(a) * r, Player.vel.x * 0.1, -0.5 - Math.random(), Player.vel.z * 0.1, 1.6 + Math.random(), 0.25, 1.3, 0.8, 1, 1, 1, 0.7, 1.4);
+        }
+        Sound.brush();
+      }
       else if (e.type === 'grindStart') Sound.grind(true);
       else if (e.type === 'comboEnd' && e.n > 1) UI.toast(`Combo ×${e.n} banked · ${e.pts.toLocaleString()} points`, 1800);
       else if (e.type === 'comboLost' && e.pts > 0) UI.toast(`Combo lost (${e.pts.toLocaleString()})`, 1600);
@@ -416,6 +440,7 @@ const Game = {
     if (pl.crashed) {
       pl.crashT += dt;
       pl.pos.copy(this.rider.J[J.pelvis]);
+      Snow.stampBody(this.rider.J);
       const R = this.rider.ragdoll;
       if (R && (R.still > 1.1 || R.t > 5)) this.respawn();
     }
@@ -576,7 +601,6 @@ const Game = {
     const bx = new V3(), by = new V3();
     pl.boardFrame(bx, by);
     const pos = pl.pos.clone();
-    if (pl.ground) pos.y -= pl.sink;
     m.stance = this.settings.stance;
     m.setBoard(pos, bx, by);
     const P = m.pose;
@@ -654,13 +678,22 @@ const Game = {
     FX.glowU.uOn.value = U.uLampOn.value;
     if (st !== 'ride') FX.updateTokens(U.uTime.value, null, () => {});
     TerrainMesh.update(this.cam);
+    // the fresh-snow layer follows whoever is standing in it
+    const snowOn = st === 'ride' || st === 'paused' || st === 'results' || st === 'title' || st === 'locker';
+    Snow.show(snowOn);
+    if (snowOn) { const f = st === 'title' || st === 'locker' ? this.lodgeSpot : Player.pos; if (f) Snow.focus(f.x, f.z); }
+    Snow.update();
     Vegetation.update(this.cam, st === 'map');
     this.rider.group.visible = st !== 'map' && !(st === 'lift' && this.liftRide && this.liftRide.lift.type.cabin);
     Sound.updateRide(Player, st === 'ride' ? 'ride' : st, Sky.weather);
     if (this.frame % 30 === 0) Sound.setMood(Sky.night, Sky.weather.snow);
     if (st === 'ride') UI.updateHud(Player, this.hudInfo());
     // post
+    const envK = lerp(0.08, 1, sstep(-0.1, 0.25, Sky.sunE)) * (1 - Sky.weather.overcast * 0.4);
+    if (this.rider.mats.lens.envMap) { this.rider.mats.lens.envMapIntensity = 1.4 * envK; this.rider.mats.gloss.envMapIntensity = 0.5 * envK; this.rider.mats.board.envMapIntensity = 0.4 * envK; }
+    if (Structures.metalMat.envMap) Structures.metalMat.envMapIntensity = 0.45 * envK;
     Post.uni.uExposure.value = Sky.exposure;
+    Post.uni.uBloom.value = this.settings.quality === 'low' ? 0 : lerp(0.22, 0.65, Sky.night);
     Post.uni.uSpeed.value = damp(Post.uni.uSpeed.value, st === 'ride' && !Player.crashed ? sstep(17, 32, Player.speed) : 0, 4, rdt);
     Post.uni.uLetter.value = damp(Post.uni.uLetter.value, this.slowmo || st === 'lift' ? 1 : 0, 5, rdt);
     Post.uni.uSat.value = this.slowmo ? 0.85 : 1.08;

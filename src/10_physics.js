@@ -78,7 +78,7 @@ const Player = {
     if (this.grind) this.stepGrind(dt, steer);
     else if (this.ground) this.stepGround(dt, steer, fb);
     else this.stepAir(dt, steer, fb);
-    if (!this.crashed) this.collide();
+    if (!this.crashed && !this.grind) this.collide();
     this.speed = this.vel.length();
     // combo window
     if (this.combo.n && this.time - this.lastLand > 2.6 && this.ground) {
@@ -129,7 +129,9 @@ const Player = {
     const g = new V3(0, -9.81, 0); g.addScaledVector(n, 9.81 * n.y);
     vT.addScaledVector(g, dt);
     speed = vT.length();
-    const mu = lerp(lerp(0.055, 0.035, S.groom), 0.1, S.powder * (1 - S.groom)) + S.road * 0.6;
+    // deep snow bogs you down when slow and lets you plane on top when fast
+    const bog = 1 + 0.9 * (1 - sstep(4, 15, speed));
+    const mu = lerp(lerp(0.055, 0.035, S.groom), 0.1 * bog, S.powder * (1 - S.groom)) + S.road * 0.6;
     const drag = this.tuck > 0.5 ? 0.0026 : 0.0042 + this.brake * 0.003;
     if (speed > 1e-3) {
       const dec = (mu * 9.81 * n.y + drag * speed * speed) * dt;
@@ -154,6 +156,19 @@ const Player = {
     const prevY = this.pos.y;
     this.pos.addScaledVector(vT, dt);
     const h = World.groundHeight(this.pos.x, this.pos.z);
+    if (h - this.pos.y > 0.45) {
+      // a step too tall to ride up (a drop seen from below, a cliff band): treat it as a wall
+      this.pos.x -= vT.x * dt; this.pos.z -= vT.z * dt; this.pos.y = prevY;
+      const gn = World.groundNormal(this.pos.x + vT.x * dt * 2, this.pos.z + vT.z * dt * 2, new V3());
+      const gl = Math.hypot(gn.x, gn.z) || 1, gx = gn.x / gl, gz = gn.z / gl;
+      const into = -(vT.x * gx + vT.z * gz);
+      if (into > 9) return this.crash('Hit a wall');
+      if (into > 0) { vT.x += gx * into * 1.2; vT.z += gz * into * 1.2; }
+      vT.multiplyScalar(0.8);
+      this.vel.copy(vT);
+      this.emit('bump', { kind: 'wall', into });
+      return;
+    }
     const gap = this.pos.y - h;
     const needA = (2 * gap) / (dt * dt); // acceleration needed to stay on the ground
     if ((gap > 0.035 && speed > 5) || (gap > 0.006 && needA > Math.max(20, 9.81 * n.y * 1.6))) {
@@ -163,6 +178,7 @@ const Player = {
       return;
     }
     this.pos.y = h;
+    if (this.tryGrindGround()) return;
     // re-project velocity on the new plane, keeping speed
     const n2 = World.groundNormal(this.pos.x, this.pos.z, new V3());
     const sp = vT.length();
@@ -174,6 +190,7 @@ const Player = {
     this.edge = damp(this.edge, edgeT, 9, dt);
     this.crouch = damp(this.crouch, 0.18 + Math.abs(this.edge) * 0.45 + this.tuck * 0.35 + this.charge * 0.55, 8, dt);
     this.sink = damp(this.sink, S.powder * (1 - S.groom) * 0.16, 4, dt);
+    if (typeof Snow !== 'undefined') Snow.stampBoard(this);
     // remember safe spots to respawn
     this.safeT += dt;
     if (this.safeT > 0.6 && sp > 2 && n2.y > 0.8 && S.road < 0.5) {
@@ -272,6 +289,7 @@ const Player = {
     this.flip = 0; this.flipVel = 0; this.spinVel = 0;
     this.crouch = Math.min(1, 0.4 + hard * 0.05);
     this.emit('land', { impact: hard, air: A.t, sketch });
+    if (typeof Snow !== 'undefined') Snow.stampLanding(this, hard);
     this.scoreTrick(A, sketch);
   },
 
@@ -331,6 +349,21 @@ const Player = {
     }
     return false;
   },
+  // riding up a box's snow ramp puts you straight onto the box
+  tryGrindGround() {
+    for (const g of World.grinds) {
+      if (g.kind !== 'box') continue;
+      const ex = this.pos.x - g.ax, ez = this.pos.z - g.az;
+      const u = ex * g.dx + ez * g.dz;
+      if (u < -0.05 || u > 1.2) continue;
+      if (Math.abs(-ex * g.dz + ez * g.dx) > g.w + 0.2) continue;
+      const along = this.vel.x * g.dx + this.vel.z * g.dz;
+      if (along < 1.5) continue;
+      this.startGrind(g, Math.max(0.05, u), along);
+      return true;
+    }
+    return false;
+  },
   startGrind(g, u, along) {
     const railYaw = Math.atan2(g.dx, g.dz);
     const off = wrapAngle(this.yaw - railYaw);
@@ -375,20 +408,33 @@ const Player = {
 
   // ---- obstacles ---------------------------------------------------------------
   collide() {
-    const p = this.pos, R = 0.35;
-    World.queryColliders(p.x, p.z, 3, this._col);
+    const p = this.pos, R = 0.35, vel = this.vel;
+    World.queryColliders(p.x, p.z, 4, this._col);
+    const limit = { tree: 8.5, rock: 6.5, building: 6, station: 6, cat: 6, tower: 7, pole: 7, gun: 7, sign: 7, box: 6.5, rail: 6.5 };
+    const names = { tree: 'Hugged a tree', rock: 'Hit a rock', building: 'Ran into a building', station: 'Hit the lift station', tower: 'Hit a lift tower', rail: 'Clipped the rail', box: 'Clipped the box', cat: 'Ran into a snowcat' };
     for (const c of this._col) {
-      const dx = p.x - c.x, dz = p.z - c.z;
-      const d = Math.hypot(dx, dz), min = c.r + R;
-      if (d >= min || p.y > c.top) continue;
-      const nx = dx / (d || 1), nz = dz / (d || 1);
-      const into = -(this.vel.x * nx + this.vel.z * nz);
-      if (into > 7.5 || (into > 5 && c.kind !== 'tree')) {
-        return this.crash(c.kind === 'tree' ? 'Hugged a tree' : c.kind === 'rock' ? 'Hit a rock' : 'Ran into something');
+      if (p.y > c.top) continue;
+      // brushing through low fir branches knocks their snow loose
+      if (c.kind === 'tree' && c.ref) {
+        const t = c.ref, canopy = t.s * (t.type ? 1.0 : 1.9) + R;
+        const dc = Math.hypot(p.x - c.x, p.z - c.z);
+        if (dc < canopy && this.speed > 3 && this.time - (t.brushT || -9) > 1.6) {
+          t.brushT = this.time;
+          vel.multiplyScalar(0.96);
+          this.emit('brush', { tree: t });
+        }
       }
-      p.x = c.x + nx * min; p.z = c.z + nz * min;
-      if (into > 0) { this.vel.x += nx * into * 1.3; this.vel.z += nz * into * 1.3; this.vel.multiplyScalar(0.85); }
-      this.emit('bump', { kind: c.kind, into });
+      const push = World.colliderPush(c, p.x, p.z, R);
+      if (!push) continue;
+      const into = -(vel.x * push.nx + vel.z * push.nz);
+      if (into > (limit[c.kind] || 7)) return this.crash(names[c.kind] || 'Ran into something');
+      p.x += push.x; p.z += push.z;
+      if (into > 0) {
+        // slide along the obstacle: lose the speed going into it, a bit of the rest to friction
+        vel.x += push.nx * into * 1.15; vel.z += push.nz * into * 1.15;
+        vel.multiplyScalar(1 - Math.min(0.3, into * 0.035));
+        this.emit('bump', { kind: c.kind, into });
+      }
     }
   },
 

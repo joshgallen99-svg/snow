@@ -29,7 +29,7 @@ const Structures = {
   init(scene) {
     this.group = new THREE.Group(); this.group.name = 'structures';
     scene.add(this.group);
-    this.propMat = stdMat({ roughness: 0.8 }, { key: 'prop' });
+    this.propMat = stdMat({ roughness: 0.8 }, { key: 'prop', fragColor: DETAIL.wood });
     this.metalMat = stdMat({ roughness: 0.45, metalness: 0.3 }, { key: 'metal' });
     this.windowsMat = stdMat({ roughness: 0.25, metalness: 0.1, flatShading: true }, {
       key: 'windows', uniforms: { uNight: U.uNight }, fragHead: 'uniform float uNight;',
@@ -194,7 +194,7 @@ const Structures = {
       this.addLiftObj(lift, m);
       const sw = this.stationWindows(lift, st, end);
       if (sw) { const w = new THREE.Mesh(sw, this.windowsMat); this.addLiftObj(lift, w); }
-      World.addCollider(st.x - dir.x * (end ? -4 : 4), st.z - dir.z * (end ? -4 : 4), T.cabin ? 9 : T.surface ? 2 : 5, st.y + 8, 'station', lift);
+      this.stationColliders(lift, st, end);
     }
 
     // carriers
@@ -322,6 +322,23 @@ const Structures = {
     }
     return b.build();
   },
+  // solid parts of a terminal: you can ride under a chairlift bonnet but not through its columns or huts
+  stationColliders(lift, st, end) {
+    const T = lift.type, d = lift.dir, ry = Math.atan2(d.x, d.z);
+    const at = (fwd, side) => ({ x: st.x + d.x * fwd + lift.right.x * side, z: st.z + d.z * fwd + lift.right.z * side });
+    const box = (p, hw, hd, top) => World.addBoxCollider(p.x, p.z, hw, hd, ry, st.y + top, 'station', lift);
+    const sgn = end ? 1 : -1;
+    if (T.cabin) box(at(sgn * 6, 0), 7.2, 11.2, 13);
+    else if (T.surface) {
+      World.addCollider(at(sgn * 1.5, 0).x, at(sgn * 1.5, 0).z, 0.45, st.y + 4, 'pole', lift);
+      if (!end) box(at(-6, 5), 1.4, 1.4, 4);
+    } else {
+      const detach = T.speed > 4;
+      box(at(sgn * 3, 0), 0.85, 0.85, 7);
+      if (detach) box(at(sgn * 8, 0), 0.85, 0.85, 7);
+      box(at(end ? 4 : -7, lift.gauge / 2 + 5), 1.8, 1.6, 4.5);
+    }
+  },
   stationWindows(lift, st, end) {
     const T = lift.type, d = lift.dir, ry = Math.atan2(d.x, d.z);
     const b = new GeoBuilder();
@@ -392,6 +409,10 @@ const Structures = {
           for (const sd of [-1, 1]) {
             const p = local(u, sd * (bd.d / 2 + 0.04));
             win.add(G.box(big ? 2.6 : 1.3, big ? 2.2 : 1.35, 0.12), { x: p.x, z: p.z, y, ry: bd.rot, color: lit() });
+            // frame, sill and a centre mullion around each window
+            b.add(G.box(big ? 2.85 : 1.5, big ? 2.4 : 1.55, 0.1), { x: p.x, z: p.z, y, ry: bd.rot, color: 0x3a2a1e });
+            b.add(G.box(big ? 3.0 : 1.62, 0.1, 0.32), { x: p.x, z: p.z, y: y - (big ? 1.18 : 0.76), ry: bd.rot, color: 0x3a2a1e, colorFn: snowCap(0.6) });
+            if (!big) win.add(G.box(0.07, 1.36, 0.14), { x: p.x, z: p.z, y, ry: bd.rot, color: 0x15100c });
           }
           if (bd.kind === 'hotel' && f > 0 && rnd() < 0.5) {
             const p = local(u, bd.d / 2 + 0.6);
@@ -596,7 +617,7 @@ const Structures = {
       b.add(G.box(3.0, 1.4, 4.2), { x, y: y + 1.7, z, ry, color: 0xd62d20 });
       b.add(G.box(2.6, 1.2, 2.2), { x: x + Math.sin(ry) * 0.8, y: y + 3.0, z: z + Math.cos(ry) * 0.8, ry, color: 0xd62d20, colorFn: snowCap(0.8) });
       b.add(G.box(4.2, 1.2, 0.3), { x: x + Math.sin(ry) * 3.4, y: y + 0.9, z: z + Math.cos(ry) * 3.4, ry, color: 0xbfc4ca });
-      World.addCollider(x, z, 3.2, y + 3.5, 'cat', null);
+      World.addBoxCollider(x, z, 1.8, 3.3, ry, y + 3.5, 'cat', null);
     }
     const m = new THREE.Mesh(b.build(), this.propMat); m.castShadow = true; m.receiveShadow = true; this.group.add(m);
   },

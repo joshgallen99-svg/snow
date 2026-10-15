@@ -8,7 +8,8 @@ const _col = new THREE.Color();
 // Merges transformed primitive geometries into one non-indexed, flat-shaded,
 // vertex-colored BufferGeometry.
 class GeoBuilder {
-  constructor() { this.pos = []; this.col = []; this.extra = null; }
+  // smooth: keep each primitive's own normals (round shapes shade smoothly, boxes stay crisp)
+  constructor(opts = {}) { this.pos = []; this.col = []; this.nrm = []; this.smooth = !!opts.smooth; }
   add(geo, opts = {}) {
     const g = geo.index ? geo.toNonIndexed() : geo;
     const p = g.attributes.position;
@@ -20,6 +21,10 @@ class GeoBuilder {
     const cr = c.r, cg = c.g, cb = c.b;
     const fn = opts.colorFn;
     const tri = [];
+    if (this.smooth) {
+      const nm = new THREE.Matrix3().getNormalMatrix(m), na = g.attributes.normal;
+      for (let i = 0; i < p.count; i++) { _v.fromBufferAttribute(na, i).applyMatrix3(nm).normalize(); this.nrm.push(_v.x, _v.y, _v.z); }
+    }
     for (let i = 0; i < p.count; i++) {
       _v2.fromBufferAttribute(p, i).applyMatrix4(m);
       this.pos.push(_v2.x, _v2.y, _v2.z);
@@ -45,7 +50,8 @@ class GeoBuilder {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
-    g.computeVertexNormals();
+    if (this.smooth && this.nrm.length === this.pos.length) g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nrm, 3));
+    else g.computeVertexNormals();
     g.computeBoundingSphere();
     return g;
   }
@@ -120,7 +126,7 @@ function patchStandard(mat, opts = {}) {
         ${opts.vertexTail || ''}`);
     if (opts.vertexBegin) sh.vertexShader = sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + opts.vertexBegin);
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nvarying vec3 vWNrm;\n' + LAMP_GLSL + (opts.fragHead || ''))
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nvarying vec3 vWNrm;\n' + LAMP_GLSL + DETAIL_GLSL + (opts.fragHead || ''))
       .replace('#include <opaque_fragment>', `
         outgoingLight += diffuseColor.rgb * lampLight(vWPos, normalize(vWNrm));
         ${opts.fragTail || ''}
@@ -134,6 +140,41 @@ function patchStandard(mat, opts = {}) {
 function stdMat(params = {}, opts = {}) {
   return patchStandard(new THREE.MeshStandardMaterial(Object.assign({ vertexColors: true, flatShading: true, roughness: 0.85, metalness: 0 }, params)), opts);
 }
+
+// procedural surface detail shared by prop materials
+const DETAIL_GLSL = /* glsl */`
+  float dh(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+  float dn(vec3 p) { vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(mix(dh(i), dh(i + vec3(1,0,0)), f.x), mix(dh(i + vec3(0,1,0)), dh(i + vec3(1,1,0)), f.x), f.y),
+               mix(mix(dh(i + vec3(0,0,1)), dh(i + vec3(1,0,1)), f.x), mix(dh(i + vec3(0,1,1)), dh(i + vec3(1,1,1)), f.x), f.y), f.z); }
+`;
+const DETAIL = {
+  // timber walls: planks with grain on warm-colored vertical faces
+  wood: /* glsl */`{
+    vec3 n = normalize(vWNrm); float lum = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
+    float warm = step(diffuseColor.b * 1.12, diffuseColor.r) * step(lum, 0.72) * (1.0 - smoothstep(0.3, 0.6, abs(n.y)));
+    float plank = smoothstep(0.88, 0.97, fract(vWPos.y * 3.3));
+    float grain = dn(vec3(vWPos.x * 0.6 + vWPos.z * 0.6, vWPos.y * 22.0, 0.0));
+    diffuseColor.rgb *= mix(1.0, (0.9 + 0.2 * grain) * (1.0 - plank * 0.35), warm);
+    // weathering on everything else
+    diffuseColor.rgb *= 0.94 + 0.12 * dn(vWPos * 1.7);
+  }`,
+  rock: /* glsl */`{
+    vec3 n = normalize(vWNrm); float lum = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
+    float bare = 1.0 - step(0.8, lum);
+    float g = dn(vWPos * 3.1) * 0.6 + dn(vWPos * 9.0) * 0.4;
+    vec3 c = diffuseColor.rgb * (0.78 + 0.42 * g);
+    c = mix(c, vec3(0.42, 0.45, 0.3), smoothstep(0.72, 0.85, dn(vWPos * 1.3 + 5.0)) * 0.35); // lichen
+    // a dusting of snow on the upward faces, with a ragged edge
+    float dust = smoothstep(0.35, 0.65, n.y + (dn(vWPos * 2.4) - 0.5) * 0.5);
+    diffuseColor.rgb = mix(diffuseColor.rgb, mix(c, vec3(0.93, 0.95, 0.98), dust), bare);
+  }`,
+  needles: /* glsl */`{
+    float lum = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
+    float leaf = 1.0 - step(0.7, lum);
+    diffuseColor.rgb *= mix(1.0, 0.82 + 0.36 * dh(floor(vWPos * 3.0)), leaf);
+  }`,
+};
 
 // snow-on-top coloring for props: faces pointing up become snow
 function snowCap(threshold = 0.55, snow = 0xf2f6fb) {
