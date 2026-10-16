@@ -25,7 +25,7 @@ const Vegetation = {
   },
   birchGeometry(lod) {
     const b = new GeoBuilder();
-    const bark = 0xe9e5dc, mark = 0x3b3631, twig = 0x5e4d4b;
+    const bark = 0xe9e5dc, mark = 0x3b3631, twig = 0x7d6c68;
     // trunk in bands so the dark lenticels show; the fine crown is drawn on crossed planes
     const bands = [[0, 1.6, bark], [1.6, 0.25, mark], [1.85, 2.2, bark], [4.05, 0.18, mark], [4.23, 2.0, bark], [6.23, 0.15, mark], [6.38, 2.6, bark]];
     for (const [y0, h, c] of bands) {
@@ -39,7 +39,7 @@ const Vegetation = {
       const cx = Math.cos(a) * Math.sin(tilt) * len * 0.5, cz = Math.sin(a) * Math.sin(tilt) * len * 0.5, cy = Math.cos(tilt) * len * 0.5;
       _q.setFromUnitVectors(_v.set(0, 1, 0), _v2.set(cx, cy, cz).normalize());
       _m4.compose(_v.set(cx, y + cy, cz), _q, _s.set(1, 1, 1));
-      b.add(G.cyl(0.02, 0.05, len, 4), { matrix: _m4.clone(), color: twig });
+      b.add(G.cyl(0.015, 0.035, len, 4), { matrix: _m4.clone(), color: twig });
     }
     return b.build();
   },
@@ -62,9 +62,9 @@ const Vegetation = {
         line(x, y, x1, y1, wpx, depth > 1 ? '#3a3132' : '#4a3d3e');
         if (depth <= 0) {
           // silver birch twigs hang down from the branch ends
-          for (let k = 0; k < 3; k++) {
-            const t = 0.4 + rnd() * 0.6, hx = x + (x1 - x) * t, hy = y + (y1 - y) * t, hl = 0.3 + rnd() * 0.6;
-            line(hx, hy, hx + (rnd() - 0.5) * 0.2, hy - hl, 0.8, 'rgba(78,64,66,0.9)');
+          for (let k = 0; k < 2; k++) {
+            const t = 0.5 + rnd() * 0.5, hx = x + (x1 - x) * t, hy = y + (y1 - y) * t, hl = 0.25 + rnd() * 0.4;
+            line(hx, hy, hx + (rnd() - 0.5) * 0.25, hy - hl, 0.7, 'rgba(92,78,80,0.85)');
           }
           return;
         }

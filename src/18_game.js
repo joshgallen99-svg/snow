@@ -86,6 +86,7 @@ const Game = {
     await step('Growing the forest', () => Vegetation.init(this.scene));
     await step('Stringing the lift cables', () => { Structures.init(this.scene); Lights.init(this.scene); });
     await step('Lighting the sky', () => { Sky.init(this.scene); FX.init(this.scene); });
+    await step('Opening the lifts to the public', () => People.init(this.scene));
     await step('Printing the trail map', () => MapView.init(this.scene));
     await step('Polishing goggles', () => {
       ENV_MAP = Sky.makeEnv(renderer);
@@ -687,6 +688,7 @@ const Game = {
     Cam.update(st === 'ride' ? dt : rdt, { player: Player, pose });
     // world
     Structures.update(rdt, Sky.night);
+    People.update(st === 'ride' ? dt : rdt, this.cam, st === 'ride' ? Player : null, this.liftRide);
     Sky.update(rdt, this.cam, st === 'ride' || st === 'paused' ? Player.pos : this.cam.position.clone().setY(World.height(this.cam.position.x, this.cam.position.z)), st === 'map' ? 'map' : 'ride');
     if (st === 'ride') { FX.boardSpray(dt, Player); FX.railSpray(dt, Player); FX.trailUpdate(Player); this.speedMotes(dt); }
     if (st === 'ride' || st === 'title' || st === 'locker' || st === 'lift') FX.emitAmbient(dt, this.cam, Sky.night, Sky.weather.wind);
@@ -739,6 +741,13 @@ const Game = {
     const n = World.normal(p.x, p.z, new V3());
     const a = this.state === 'locker' ? 0 : 0.6;
     m.setBoard(p, new V3(Math.cos(a), 0, Math.sin(a)), n);
+    // stand on a packed spot: a stomped-down patch where the rider has been waiting
+    const key = Snow.origin.x + ',' + Snow.origin.z + ',' + a;
+    if (this._idleStamp !== key) {
+      this._idleStamp = key;
+      for (let k = -3; k <= 3; k++) Snow.stampCircle(p.x + Math.cos(a) * k * 0.28, p.z + Math.sin(a) * k * 0.28, 0.55, 0.95);
+      Snow.stampCircle(p.x, p.z, 1.3, 0.55);
+    }
     Object.assign(m.pose, { sit: 0, crouch: 0.12 + Math.sin(U.uTime.value * 1.3) * 0.03, tuck: 0, brake: 0, lean: 0, arms: 0.15, grab: null, grabAmt: 0, twist: Math.sin(U.uTime.value * 0.5) * 0.2, look: 0.3, lookDir: 1 });
     m.pose.wave += dt;
     m.solvePose(dt); m.draw();

@@ -240,7 +240,7 @@ const TerrainMesh = {
         // forest floor: shaded snow, needle and twig litter close up, a dark mass from afar
         float far = smoothstep(250.0, 1400.0, camD);
         col = mix(col, vec3(0.62, 0.68, 0.74), forestA * 0.35 * (1.0 - far));
-        float litter = step(0.93, th(floor(vWPos.xz * 7.0))) * smoothstep(0.25, 0.7, forestA) * (1.0 - smoothstep(8.0, 30.0, camD)) * (1.0 - clamp(vComp, 0.0, 1.0));
+        float litter = step(0.93, th(floor(vWPos.xz * 7.0))) * smoothstep(0.25, 0.7, forestA) * (1.0 - groomA) * (1.0 - smoothstep(0.2, 0.6, vData2.y)) * (1.0 - smoothstep(8.0, 30.0, camD)) * (1.0 - clamp(vComp, 0.0, 1.0));
         col = mix(col, vec3(0.28, 0.22, 0.18), litter * 0.55);
         // from afar a forest is a speckle of dark firs and grey-brown bare birch over the snow
         float stand = vnoise(vWPos.xz * 0.045) * 0.6 + vnoise(vWPos.xz * 0.19) * 0.4;
