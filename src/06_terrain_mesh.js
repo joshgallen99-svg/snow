@@ -251,7 +251,7 @@ const TerrainMesh = {
         col = mix(col, woodC, clamp(dens, 0.0, 0.97) * (0.1 + 0.86 * far) * (1.0 - rock));
         // plowed roads
         float tracks = smoothstep(0.35, 0.5, abs(fract(q * 0.45) - 0.5));
-        col = mix(col, mix(vec3(0.42, 0.42, 0.43), vec3(0.30, 0.30, 0.31), tracks * 0.7), roadA);
+        col = mix(col, mix(vec3(0.34, 0.34, 0.36), vec3(0.22, 0.22, 0.24), tracks * 0.7), roadA);
         diffuseColor.rgb = col;
       `,
       fragTail: /* glsl */`

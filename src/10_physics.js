@@ -598,8 +598,8 @@ const Player = {
   collide() {
     const p = this.pos, R = 0.35, vel = this.vel;
     World.queryColliders(p.x, p.z, 4, this._col);
-    const limit = { tree: 8.5, rock: 6.5, building: 6, station: 6, cat: 6, tower: 7, pole: 7, gun: 7, sign: 7, box: 6.5, rail: 6.5, log: 6.5 };
-    const names = { tree: 'Hugged a tree', rock: 'Hit a rock', building: 'Ran into a building', station: 'Hit the lift station', tower: 'Hit a lift tower', rail: 'Clipped the rail', box: 'Clipped the box', log: 'Tripped on a log', cat: 'Ran into a snowcat' };
+    const limit = { tree: 8.5, rock: 6.5, building: 6, station: 6, cat: 6, tower: 7, pole: 7, gun: 7, sign: 7, box: 6.5, rail: 6.5, log: 6.5, car: 6 };
+    const names = { tree: 'Hugged a tree', rock: 'Hit a rock', building: 'Ran into a building', station: 'Hit the lift station', tower: 'Hit a lift tower', rail: 'Clipped the rail', box: 'Clipped the box', log: 'Tripped on a log', cat: 'Ran into a snowcat', car: 'Ran into a parked car' };
     for (const c of this._col) {
       if (p.y > c.top) continue;
       // rocks are solid ground (World.groundHeight): ride over the small ones, the big ones act as walls

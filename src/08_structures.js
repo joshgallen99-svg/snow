@@ -39,6 +39,7 @@ const Structures = {
     this.snowMat = stdMat({ roughness: 0.9, flatShading: false, vertexColors: true }, { key: 'snowprop' });
     for (const L of LIFTS) this.lifts.push(this.buildLift(L));
     this.buildBuildings();
+    this.buildStreetLife();
     this.buildLamps();
     this.buildGuns();
     this.buildPark();
@@ -50,6 +51,7 @@ const Structures = {
   },
   // separated so canvas text waits for webfonts
   buildSigns() {
+    this.buildShopSigns();
     for (const s of Scatter.signs) {
       const run = RUNS[s.run];
       const tex = canvasTexture(512, 256, (ctx, w, h) => {
@@ -385,6 +387,14 @@ const Structures = {
       const wallC = new THREE.Color(bd.wall);
       b.add(G.box(bd.w + 0.6, 0.8, bd.d + 0.6), o({ y: bd.y + 0.2, color: 0x6e6a66 }));
       b.add(G.box(bd.w, H, bd.d), o({ y: bd.y + H / 2 + 0.4, color: bd.wall }));
+      // a stone plinth, dark corner boards and a band between floors give the walls some structure
+      b.add(G.box(bd.w + 0.16, 1.1, bd.d + 0.16), o({ y: bd.y + 0.95, color: 0x5e5954 }));
+      const trim = wallC.clone().multiplyScalar(0.55).getHex();
+      for (const [cx, cz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+        const cp = local(cx * (bd.w / 2), cz * (bd.d / 2));
+        b.add(G.box(0.34, H, 0.34), { x: cp.x, z: cp.z, y: bd.y + H / 2 + 0.4, ry: bd.rot, color: trim });
+      }
+      for (let f = 1; f < bd.floors; f++) b.add(G.box(bd.w + 0.1, 0.16, bd.d + 0.1), o({ y: bd.y + 0.4 + f * fh, color: trim }));
       const top = bd.y + H + 0.4;
       if (bd.flat) {
         b.add(G.box(bd.w + 0.3, 0.5, bd.d + 0.3), o({ y: top + 0.25, color: bd.roof }));
@@ -419,6 +429,9 @@ const Structures = {
           if (bd.kind === 'hotel' && f > 0 && rnd() < 0.5) {
             const p = local(u, bd.d / 2 + 0.6);
             b.add(G.box(step * 0.8, 0.12, 1.1), { x: p.x, z: p.z, y: y - 0.85, ry: bd.rot, color: 0x3a3632, colorFn: snowCap(0.6) });
+            const rp = local(u, bd.d / 2 + 1.12);
+            b.add(G.box(step * 0.8, 0.06, 0.06), { x: rp.x, z: rp.z, y: y + 0.05, ry: bd.rot, color: 0x23272c, colorFn: snowCap(0.6) });
+            for (const k of [-0.38, 0, 0.38]) { const pp = local(u + k * step, bd.d / 2 + 1.12); b.add(G.box(0.05, 0.9, 0.05), { x: pp.x, z: pp.z, y: y - 0.4, ry: bd.rot, color: 0x23272c }); }
           }
         }
         for (let v = -bd.d / 2 + 2; v < bd.d / 2 - 1; v += 2.8) {
@@ -443,6 +456,105 @@ const Structures = {
     }
     const m = new THREE.Mesh(b.build(), this.propMat); m.castShadow = true; m.receiveShadow = true; this.group.add(m);
     const w = new THREE.Mesh(win.build(), this.windowsMat); this.group.add(w);
+  },
+
+  // ---------------------------------------------------------------------------
+  //  the village streets: plowed snowbanks, parked cars, vending machines
+  // ---------------------------------------------------------------------------
+  buildStreetLife() {
+    const rnd = mulberry32(404);
+    const banks = new GeoBuilder({ smooth: true }), cars = new GeoBuilder(), vend = new GeoBuilder(), vendGlow = new GeoBuilder();
+    const inVillage = (x, z) => Math.hypot((x - VILLAGE.center[0]) / 1.3, z - VILLAGE.center[1]) < 520 || Math.hypot(x - VILLAGE.east[0], z - VILLAGE.east[1]) < 260;
+    const carCols = [0xf2f2f0, 0x1d1f24, 0x8c9096, 0xb22a26, 0x2c4f86, 0xd9d4c8, 0x3c5a44];
+    this.shopSpots = [];
+    ROADS.forEach((road, ri) => {
+      const pts = resamplePath(road.pts, 3);
+      let carGap = 0;
+      for (let i = 1; i < pts.length; i++) {
+        const [x0, z0] = pts[i - 1], [x1, z1] = pts[i];
+        if (!inVillage(x1, z1)) continue;
+        const l = Math.hypot(x1 - x0, z1 - z0) || 1, tx = (x1 - x0) / l, tz = (z1 - z0) / l, nx = -tz, nz = tx;
+        for (const sd of [-1, 1]) {
+          // the plow leaves a lumpy bank of snow along each side of the road
+          const off = road.w * 0.82 + 0.6 + rnd() * 0.5;
+          const x = x1 + nx * off * sd, z = z1 + nz * off * sd;
+          if (World.attr(World.inRun, x, z) > 40) continue;
+          const y = World.height(x, z);
+          banks.add(G.ico(1, 1), { x, y: y + 0.1, z, ry: Math.atan2(tx, tz) + (rnd() - 0.5) * 0.4, sx: 0.9 + rnd() * 0.4, sy: 0.55 + rnd() * 0.45, sz: 1.8 + rnd() * 0.8, color: rnd() < 0.15 ? 0xd8dde4 : 0xf1f4f8 });
+        }
+        // cars parked along the streets
+        carGap -= l;
+        if (ri > 0 && carGap <= 0 && rnd() < 0.55) {
+          carGap = 7 + rnd() * 10;
+          const sd = rnd() < 0.5 ? -1 : 1, off = road.w * 0.82 - 1.3;
+          const x = x1 + nx * off * sd, z = z1 + nz * off * sd, y = World.height(x, z);
+          const ry = Math.atan2(tx, tz) + (rnd() < 0.5 ? 0 : Math.PI), col = carCols[Math.floor(rnd() * carCols.length)];
+          const box = rnd() < 0.4; // kei vans are tall and square
+          cars.add(G.box(1.7, 0.75, box ? 3.6 : 4.3), { x, y: y + 0.65, z, ry, color: col });
+          cars.add(G.box(1.55, box ? 0.95 : 0.7, box ? 2.6 : 2.2), { x: x - Math.sin(ry) * (box ? 0.25 : 0.2), y: y + (box ? 1.5 : 1.35), z: z - Math.cos(ry) * (box ? 0.25 : 0.2), ry, color: 0x1a2028 });
+          cars.add(G.box(1.5, 0.2, box ? 2.4 : 2.0), { x: x - Math.sin(ry) * 0.2, y: y + (box ? 2.05 : 1.78), z: z - Math.cos(ry) * 0.2, ry, color: 0xf2f5f9 }); // snow on the roof
+          for (const [wx, wz] of [[-0.8, 1.3], [0.8, 1.3], [-0.8, -1.3], [0.8, -1.3]]) {
+            const c = Math.cos(ry), s = Math.sin(ry);
+            cars.add(G.cyl(0.33, 0.33, 0.24, 8), { x: x + wx * c + wz * s, y: y + 0.35, z: z - wx * s + wz * c, rz: Math.PI / 2, ry, order: 'YXZ', color: 0x15171a });
+          }
+          World.addBoxCollider(x, z, 0.9, box ? 1.85 : 2.2, ry, y + 1.8, 'car', null);
+        }
+      }
+    });
+    // vending machines by doors, and a shop sign on buildings that face a street
+    for (const bd of Scatter.buildings) {
+      if (!inVillage(bd.x, bd.z)) continue;
+      const cs = Math.cos(bd.rot), sn = Math.sin(bd.rot);
+      const local = (lx, lz) => ({ x: bd.x + lx * cs + lz * sn, z: bd.z - lx * sn + lz * cs });
+      if (bd.kind !== 'lodge' && rnd() < 0.45) {
+        const p = local(bd.w / 2 - 1.2, bd.d / 2 + 0.55);
+        const col = [0xd0302a, 0x2a62b8, 0xf2f2f2, 0x2f9a5a][Math.floor(rnd() * 4)];
+        vend.add(G.box(1.0, 1.85, 0.75), { x: p.x, y: bd.y + 0.93 + 0.4, z: p.z, ry: bd.rot, color: col, colorFn: snowCap(0.8) });
+        const f = local(bd.w / 2 - 1.2, bd.d / 2 + 0.94);
+        vendGlow.add(G.box(0.8, 1.1, 0.04), { x: f.x, y: bd.y + 1.6, z: f.z, ry: bd.rot, color: 0xf4f6ff });
+        World.addBoxCollider(p.x, p.z, 0.5, 0.4, bd.rot, bd.y + 2.3, 'building', null);
+      }
+      if ((bd.kind === 'hotel' || bd.kind === 'chalet') && rnd() < 0.6) this.shopSpots.push({ x: local(0, bd.d / 2 + 0.2).x, z: local(0, bd.d / 2 + 0.2).z, y: bd.y + 0.4 + 3.1 * 0.9, ry: bd.rot });
+    }
+    const add = (g, mat, shadow) => { if (!g.count) return; const m = new THREE.Mesh(g.build(), mat); m.castShadow = shadow; m.receiveShadow = true; this.group.add(m); };
+    add(banks, this.snowMat, true);
+    add(cars, this.metalMat, true);
+    add(vend, this.propMat, true);
+    if (vendGlow.count) this.group.add(new THREE.Mesh(vendGlow.build(), this.windowsMat));
+  },
+  // shop signs need the webfonts, so they're built with the trail signs
+  buildShopSigns() {
+    const names = [['RAMEN', '#b8261f', '#fff4e0'], ['IZAKAYA', '#2b2420', '#ffcf7a'], ['ONSEN ♨', '#1f4f7a', '#ffffff'], ['SKI RENTAL', '#f2efe8', '#1b1d22'], ['CAFÉ', '#3c5a44', '#f6efe0'], ['BAR', '#121418', '#ff7a4a'], ['SUSHI', '#f4ede0', '#b8261f'], ['MART', '#2a62b8', '#ffffff']];
+    const tex = canvasTexture(1024, 256, (ctx, w, h) => {
+      names.forEach(([t, bg, fg], i) => {
+        const x = (i % 4) * 256, y = Math.floor(i / 4) * 128;
+        ctx.fillStyle = bg; ctx.fillRect(x + 4, y + 4, 248, 120);
+        ctx.strokeStyle = fg; ctx.lineWidth = 4; ctx.strokeRect(x + 12, y + 12, 232, 104);
+        ctx.fillStyle = fg; ctx.font = '800 46px Outfit, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(t, x + 128, y + 66, 220);
+      });
+    });
+    const pos = [], uv = [], nrm = [], idx = [];
+    this.shopSpots.forEach((sp, k) => {
+      const i = k % names.length, u0 = (i % 4) / 4, v1 = 1 - Math.floor(i / 4) / 2, v0 = v1 - 0.5;
+      const w = 2.6, h = 1.3, c = Math.cos(sp.ry), s = Math.sin(sp.ry), base = pos.length / 3;
+      const out = 0.06;
+      for (const [a, bb] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+        pos.push(sp.x + a * w / 2 * c + out * s, sp.y + bb * h / 2, sp.z - a * w / 2 * s + out * c);
+        nrm.push(s, 0, c);
+      }
+      uv.push(u0, v0, u0 + 0.25, v0, u0 + 0.25, v1, u0, v1);
+      idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    });
+    if (!idx.length) return;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx);
+    // signs light up at night
+    this.shopMat = new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.6 });
+    this.group.add(new THREE.Mesh(g, this.shopMat));
   },
 
   // ---------------------------------------------------------------------------
@@ -675,5 +787,6 @@ const Structures = {
   update(dt, night) {
     for (const lift of this.lifts) this.updateLift(lift, dt);
     if (this.glowMat) this.glowMat.color.setScalar(0.15 + night * 3.0);
+    if (this.shopMat) this.shopMat.emissiveIntensity = night * 0.9;
   },
 };

@@ -9,9 +9,9 @@ const PALETTE = [
   { e: 0.0,   zen: 0x27407a, hor: 0xf08a6a, sun: 0xff9a6b, si: 0.9,  hs: 0x7a86b8, hg: 0x40384a, hi: 0.7,  fog: 0xc99086, exp: 1.05 },
   { e: 0.1,   zen: 0x3a68b8, hor: 0xffbf8e, sun: 0xffb070, si: 2.3,  hs: 0x98aed8, hg: 0x6a6270, hi: 0.78, fog: 0xe8c2a4, exp: 0.95 },
   // golden hour: low warm sun, cool blue shadows
-  { e: 0.2,   zen: 0x3b70c8, hor: 0xf4d6bc, sun: 0xffd09a, si: 2.6,  hs: 0xa6bce4, hg: 0x7c7888, hi: 0.84, fog: 0xdccabc, exp: 0.9 },
-  { e: 0.32,  zen: 0x3d78d6, hor: 0xc9dcf2, sun: 0xfff0dc, si: 2.85, hs: 0xb8d0f0, hg: 0x8892a8, hi: 0.9,  fog: 0xc5d6ea, exp: 0.88 },
-  { e: 0.9,   zen: 0x2f6fd8, hor: 0xbcd6f4, sun: 0xfff8ef, si: 3.2,  hs: 0xc2d8f6, hg: 0x929eb4, hi: 0.95, fog: 0xbfd3ec, exp: 0.85 },
+  { e: 0.2,   zen: 0x3b70c8, hor: 0xf4d6bc, sun: 0xffd09a, si: 2.6,  hs: 0xa6bce4, hg: 0x7c7888, hi: 0.84, fog: 0xdccabc, exp: 0.84 },
+  { e: 0.32,  zen: 0x3d78d6, hor: 0xc9dcf2, sun: 0xfff0dc, si: 2.85, hs: 0xb8d0f0, hg: 0x8892a8, hi: 0.9,  fog: 0xc5d6ea, exp: 0.8 },
+  { e: 0.9,   zen: 0x2f6fd8, hor: 0xbcd6f4, sun: 0xfff8ef, si: 3.2,  hs: 0xc2d8f6, hg: 0x929eb4, hi: 0.95, fog: 0xbfd3ec, exp: 0.77 },
 ];
 const OVERCAST = { zen: 0x9aa6b4, hor: 0xc9d0d8, fog: 0xc4cbd3, hs: 0xc2cad4, hg: 0x9aa2ae };
 const OVERCAST_NIGHT = { zen: 0x161c28, hor: 0x2a3242, fog: 0x2a3242, hs: 0x4c5668, hg: 0x262c38 };
