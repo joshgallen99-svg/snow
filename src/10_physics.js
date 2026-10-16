@@ -405,6 +405,13 @@ const Player = {
     this.flip = 0; this.flipVel = 0; this.spinVel = 0;
     this.crouch = Math.min(1, 0.4 + hard * 0.05);
     if (Math.abs(this.tweakR) + Math.abs(this.tweakP) > 0.25 && A.grab) { this.vel.multiplyScalar(0.92); }
+    // a clean touchdown (board lined up with the travel, flip finished, grab let go, not too hard)
+    // after real air gives a push: more air, more speed; a perfect pop off the lip adds a bit more
+    if (!sketch && !A.grab && A.t > 0.45 && mis < 0.22 && flipRes < 0.35 && hard < 17 && speedT > 2) {
+      const gain = Math.min(5.5, (0.5 + A.t * 1.5) * (A.perfect ? 1.25 : 1));
+      this.vel.multiplyScalar((speedT * keep + gain) / Math.max(0.1, speedT * keep));
+      this.emit('perfectLand', { air: A.t, gain });
+    }
     this.emit('land', { impact: hard, air: A.t, sketch });
     if (typeof Snow !== 'undefined') Snow.stampLanding(this, hard);
     this.scoreTrick(A, sketch);

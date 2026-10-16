@@ -144,6 +144,17 @@ kbd { display: inline-block; min-width: 18px; padding: 2px 7px; border-radius: 6
 #balance.sweet .bl-zone { background: rgba(89,211,140,.5); }
 #balance .bl-needle { position: absolute; top: -5px; width: 4px; height: 22px; margin-left: -2px; border-radius: 3px; background: #fff; box-shadow: 0 0 0 2px rgba(15,26,44,.85), 0 0 12px rgba(255,255,255,.7); }
 #balance.danger .bl-needle { background: var(--bad); box-shadow: 0 0 0 2px rgba(15,26,44,.85), 0 0 14px rgba(255,107,94,.9); }
+#perfect { position: absolute; left: 50%; top: 27%; transform: translateX(-50%); text-align: center; white-space: nowrap; text-shadow: 0 2px 4px rgba(0,0,0,.5), 0 3px 18px rgba(0,0,0,.45); }
+#perfect .pl-t { font-size: 40px; font-weight: 800; font-style: italic; letter-spacing: .04em; text-transform: uppercase; color: var(--amber); }
+#perfect .pl-s { font-size: 20px; font-weight: 700; margin-top: 2px; }
+#perfect .pl-s em { font-style: normal; font-weight: 600; color: #e4eaf2; font-size: 14px; margin-left: 10px; }
+#perfect.go { animation: plIn 1.5s cubic-bezier(.2,1.5,.4,1) forwards; }
+@keyframes plIn { 0% { opacity: 0; transform: translateX(-50%) scale(.6); } 14% { opacity: 1; transform: translateX(-50%) scale(1.08); } 24% { transform: translateX(-50%) scale(1); } 78% { opacity: 1; transform: translateX(-50%) translateY(0); } 100% { opacity: 0; transform: translateX(-50%) translateY(-18px); } }
+#boostFlash { position: absolute; inset: 0; opacity: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(242,177,74,.38) 100%); }
+#boostFlash.go { animation: bf .7s ease-out; }
+@keyframes bf { 0% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { #perfect.go { animation: none; } #boostFlash.go { animation: none; } }
+@media (max-width: 640px) { #perfect .pl-t { font-size: 28px; } }
 #prompt { position: absolute; left: 50%; bottom: 26%; transform: translateX(-50%); padding: 10px 16px; font-weight: 600; }
 
 /* map UI */
@@ -229,7 +240,7 @@ kbd { display: inline-block; min-width: 18px; padding: 2px 7px; border-radius: 6
 <section id="title" class="glass" hidden>
   <div class="kanji" aria-hidden="true">北風</div>
   <h1>Kitakaze Peak</h1>
-  <p>A volcano resort in deep snow country. Nine lifts, seventeen runs, and all the powder you can find.</p>
+  <p>A volcano resort in deep snow country. Ten lifts, twenty-one runs, and all the powder you can find.</p>
   <div class="menu">
     <button class="btn primary" id="bRide"><span>Ride the mountain</span><span>Live cam</span></button>
     <button class="btn" id="bLocker"><span>Gear locker</span><span id="bLockerNote">Boards &amp; outfits</span></button>
@@ -265,10 +276,9 @@ kbd { display: inline-block; min-width: 18px; padding: 2px 7px; border-radius: 6
     <label for="sMusic">Music volume</label><input type="range" id="sMusic" min="0" max="1" step="0.05">
     <label for="sSfx">Sound effects</label><input type="range" id="sSfx" min="0" max="1" step="0.05">
     <label for="sQuality">Graphics quality</label><select id="sQuality"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select>
-    <label for="sTime">Time of day</label><select id="sTime"><option value="cycle">Cycle through the day</option><option value="7">Dawn</option><option value="11.5">Midday</option><option value="16.6">Golden hour</option><option value="20.5">Night skiing</option></select>
+    <label for="sTime">Time of day</label><select id="sTime"><option value="11.5">Day</option><option value="16.6">Sunset</option><option value="20.5">Night</option></select>
     <label for="sWeather">Weather</label><select id="sWeather"><option value="auto">Changes over time</option><option value="clear">Bluebird</option><option value="cloudy">Overcast</option><option value="snow">Snowing</option><option value="storm">Whiteout</option></select>
     <label for="sStance">Stance</label><select id="sStance"><option value="1">Regular (left foot forward)</option><option value="-1">Goofy (right foot forward)</option></select>
-    <label for="sCine">Cinematic jump camera</label><select id="sCine"><option value="1">On</option><option value="0">Off</option></select>
     <label for="sGhost">Race your best-run ghost</label><select id="sGhost"><option value="0">Off</option><option value="1">On</option></select>
     <label for="sUnlock">Unlock every lift</label><select id="sUnlock"><option value="0">No, earn them</option><option value="1">Yes</option></select>
     <label for="sReset">Progress</label><button class="btn small" id="sReset">Reset progress</button>
@@ -285,6 +295,7 @@ kbd { display: inline-block; min-width: 18px; padding: 2px 7px; border-radius: 6
     <div><kbd>W</kbd> / <kbd>↑</kbd></div><div>Tuck for speed. In the air: frontflip. On flats: skate.</div>
     <div><kbd>S</kbd> / <kbd>↓</kbd></div><div>Skid to slow down. In the air: backflip.</div>
     <div><kbd>Space</kbd></div><div>Hold to crouch, release to ollie. Release right at the edge of a kicker lip for a perfect pop: more speed and height. Jump off rails.</div>
+    <div>Landing</div><div>Land clean (board pointing where you are going, flip finished, grabs let go) for a perfect landing and a speed boost. The longer the air, the bigger the boost.</div>
     <div>Rails and boxes</div><div>Touch one and you snap on. Keep the balance needle near the middle with <kbd>A</kbd> and <kbd>D</kbd>: it wanders off on its own. Let it reach the edge and you slip off.</div>
     <div><kbd>Q</kbd> / <kbd>F</kbd></div><div>Press the front or back of the board into the snow. Add <kbd>A</kbd> or <kbd>D</kbd> to butter-spin on it. Ollie off a nose press for a nollie.</div>
     <div>On a rail</div><div><kbd>W</kbd> switches up 180, <kbd>S</kbd> switches between 50-50 and boardslide, <kbd>Q</kbd> / <kbd>F</kbd> press for nose and tail slides. Spin onto a rail and off it for 270-ons and spin-outs.</div>
@@ -324,6 +335,8 @@ kbd { display: inline-block; min-width: 18px; padding: 2px 7px; border-radius: 6
   </div>
   <div id="tricks"></div>
   <div id="combo"></div>
+  <div id="boostFlash"></div>
+  <div id="perfect" hidden aria-live="polite"></div>
   <div id="msg"></div>
   <div id="prompt" class="glass" hidden></div>
   <div id="balance" class="glass" hidden aria-label="Rail balance">

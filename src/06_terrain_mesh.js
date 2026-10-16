@@ -263,8 +263,8 @@ const TerrainMesh = {
           vec3 cellP = floor(vWPos * 22.0);
           float rnd = th(cellP.xz + cellP.y * 7.13 + floor(V.xz * 6.0));
           float spec = pow(max(dot(normalize(vWNrm), Hh), 0.0), 18.0);
-          float spark = step(0.9965, rnd) * spec * (1.0 - smoothstep(10.0, 70.0, length(vWPos - cameraPosition)));
-          outgoingLight += uSunColor * spark * 3.5 * (1.0 - vData.w) * (1.0 - clamp(vComp, 0.0, 1.0)) * max(uSunDir.y, 0.0);
+          float spark = step(0.993, rnd) * spec * (1.0 - smoothstep(15.0, 120.0, length(vWPos - cameraPosition)));
+          outgoingLight += uSunColor * spark * 5.0 * (1.0 - vData.w) * (1.0 - clamp(vComp, 0.0, 1.0)) * max(uSunDir.y, 0.0);
         }
       `,
     });
@@ -304,7 +304,7 @@ const TerrainMesh = {
         #include <normal_fragment_maps>
         {
           float camD2 = length(vWPos - cameraPosition);
-          float near = 1.0 - smoothstep(14.0, 40.0, camD2);
+          float near = 1.0 - smoothstep(25.0, 75.0, camD2);
           float th1 = vData2.x; vec2 dT = vec2(cos(th1), sin(th1)); vec2 dN = vec2(-dT.y, dT.x);
           float q2 = dot(vWPos.xz, dN);
           float cord = sin(q2 * 6.2831 / 0.11) * vData.x * (1.0 - smoothstep(5.0, 22.0, camD2)) * 0.2;
@@ -313,7 +313,9 @@ const TerrainMesh = {
           float rip = (vnoise(rp) - 0.5 + (vnoise(rp * 3.1) - 0.5) * 0.4) * (1.0 - vData.x) * (0.25 + vData.y * 0.4) * (1.0 - smoothstep(20.0, 90.0, camD2));
           // fine grain: small lumps you only see up close
           float g1 = vnoise(vWPos.xz * 6.0) - 0.5, g2 = vnoise(vWPos.zx * 6.0 + 11.0) - 0.5;
-          vec3 pw = vec3(dN.x, 0.0, dN.y) * cord + vec3(0.6, 0.0, 0.3) * rip + vec3(g1, 0.0, g2) * 0.12 * near * (1.0 - vData.w);
+          // and a coarser crust a hand's width across: the surface reads rough, not plastic
+          float g3 = vnoise(vWPos.xz * 1.9 + 5.0) - 0.5, g4 = vnoise(vWPos.zx * 1.9 + 23.0) - 0.5;
+          vec3 pw = vec3(dN.x, 0.0, dN.y) * cord + vec3(0.6, 0.0, 0.3) * rip + vec3(g1 + g3 * 0.8, 0.0, g2 + g4 * 0.8) * 0.26 * near * (1.0 - vData.w);
           ${overlay ? `
           // crisp groove walls from the compaction map
           {
@@ -326,8 +328,8 @@ const TerrainMesh = {
           normal = normalize(normal + (viewMatrix * vec4(pw, 0.0)).xyz);
         }
       `).replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-        roughnessFactor = mix(0.92, 0.72, vData.x); roughnessFactor = mix(roughnessFactor, 0.45, vData.w);
-        roughnessFactor = mix(roughnessFactor, 0.62, clamp(vComp, 0.0, 1.0));`);
+        roughnessFactor = mix(0.62, 0.5, vData.x); roughnessFactor = mix(roughnessFactor, 0.45, vData.w);
+        roughnessFactor = mix(roughnessFactor, 0.48, clamp(vComp, 0.0, 1.0));`);
     };
     if (overlay) {
       mat.polygonOffset = true; mat.polygonOffsetFactor = -1; mat.polygonOffsetUnits = -2;

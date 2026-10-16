@@ -17,7 +17,7 @@ const OVERCAST = { zen: 0x9aa6b4, hor: 0xc9d0d8, fog: 0xc4cbd3, hs: 0xc2cad4, hg
 const OVERCAST_NIGHT = { zen: 0x161c28, hor: 0x2a3242, fog: 0x2a3242, hs: 0x4c5668, hg: 0x262c38 };
 
 const Sky = {
-  time: 9.2, dayLength: 24 * 60, cycle: true,
+  time: 11.5, dayLength: 24 * 60, cycle: false,
   weather: { overcast: 0, snow: 0, wind: 0.2, target: { overcast: 0, snow: 0, wind: 0.2 }, state: 'clear', next: 200 },
   night: 0, sunE: 0.5, sunDir: new V3(), moonDir: new V3(),
   dome: null, sun: null, hemi: null, snowPts: null, exposure: 0.9, fogColor: new THREE.Color(),

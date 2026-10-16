@@ -10,7 +10,7 @@ const Game = {
   defaults() {
     return {
       v: 3, done: {}, best: {}, tokens: [], gear: { board: 'blackout', jacket: 'onyx', pants: 'jet', helmet: 'black', goggles: 'red' },
-      settings: { music: 0.5, sfx: 0.8, quality: 'high', time: 'cycle', weather: 'auto', stance: 1, cine: false, ghost: false, unlockAll: false },
+      settings: { music: 0.5, sfx: 0.8, quality: 'high', time: '11.5', weather: 'auto', stance: 1, cine: false, ghost: false, unlockAll: false },
       ghosts: {},
     };
   },
@@ -134,7 +134,9 @@ const Game = {
   applySettings() {
     const s = this.settings;
     Sound.setVolumes(s.music, s.sfx);
-    if (s.time === 'cycle') Sky.cycle = true; else { Sky.cycle = false; Sky.time = +s.time; }
+    // time of day is picked in settings and stays put
+    if (!['11.5', '16.6', '20.5'].includes(String(s.time))) s.time = '11.5';
+    Sky.cycle = false; Sky.time = +s.time;
     Sky.autoWeather = s.weather === 'auto';
     if (s.weather !== 'auto' && Sky.weather.state !== s.weather) Sky.setWeather(s.weather, !this.weatherApplied);
     this.weatherApplied = true;
@@ -429,6 +431,7 @@ const Game = {
       else if (e.type === 'grindStart') { Sound.grind(true); Cam.kick(0.15); }
       else if (e.type === 'lostBalance') { UI.message('Lost your balance', '', 1100); Sound.bump(); }
       else if (e.type === 'railPop') Sound.pop();
+      else if (e.type === 'perfectLand') { UI.perfectLanding(e.gain * 3.6, e.air); Sound.chime(9); Cam.kick(0.25); }
       else if (e.type === 'perfectPop') { UI.trick({ name: 'Perfect pop', pts: 0, mult: 1, pop: true }); Sound.chime(7); Cam.kick(0.2); }
       else if (e.type === 'comboEnd' && e.n > 1) UI.toast(`Combo ×${e.n} banked · ${e.pts.toLocaleString()} points`, 1800);
       else if (e.type === 'comboLost' && e.pts > 0) UI.toast(`Combo lost (${e.pts.toLocaleString()})`, 1600);

@@ -29,17 +29,16 @@ const Cam = {
     const want = sp > 2 ? vh.normalize() : new V3(Math.sin(pl.yaw) * pl.ride, 0, Math.cos(pl.yaw) * pl.ride);
     const a0 = Math.atan2(this.dir.x, this.dir.z), a1 = Math.atan2(want.x, want.z);
     // follow the direction of travel (spins don't change it, so the camera never swings with them)
-    const a = dampAngle(a0, a1, pl.ground || pl.grind ? 3.2 : 1.8, dt);
+    const a = dampAngle(a0, a1, 3.2, dt);
     this.dir.set(Math.sin(a), 0, Math.cos(a));
     const speed = pl.vel.length();
     const fast = sstep(8, 30, speed);
     const airborne = !pl.ground && !pl.grind && !pl.crashed;
-    this.airK = damp(this.airK || 0, airborne ? 1 : 0, airborne ? 2.5 : 4, dt);
-    // in the air the camera rises and backs off a little so you can see the rider and the landing
-    const dist = 5.2 + speed * 0.04 + this.airK * 1.4, height = 1.9 - fast * 0.55 + this.airK * 1.0;
+    // jumps don't move the camera: it behaves exactly as on the ground, so landings stay readable
+    this.airK = 0;
+    const dist = 5.6 + speed * 0.04, height = 2.7 - fast * 0.55;
     // track the rider's height closely: a touch of lag in the air, none on the ground
-    if (this.camY == null || !airborne) this.camY = pl.pos.y;
-    else this.camY = damp(this.camY, pl.pos.y, 6, dt);
+    this.camY = pl.pos.y;
     const base = new V3(pl.pos.x, this.camY + 1.1, pl.pos.z);
     out.pos.copy(base).addScaledVector(this.dir, -dist).add(new V3(0, height, 0));
     // stay well above the snow (the fresh layer can be 60 cm deep), uphill of the rider included
@@ -106,6 +105,7 @@ const Cam = {
     return out;
   },
   startCine(pl) {
+    return; // no cinematic jump camera: it made landings harder
     if (!this.cineOn) return;
     const vy = pl.vel.y, t = Math.max(0, (vy + Math.sqrt(Math.max(0, vy * vy + 2 * 9.81 * 3))) / 9.81);
     if (t < 1.05) return;

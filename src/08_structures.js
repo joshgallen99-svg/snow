@@ -621,16 +621,22 @@ const Structures = {
     const pos = [], col = [], idx = [];
     const cSnow = new THREE.Color(0xe8eef6), cLip = new THREE.Color(0x2f7bd8), cSide = new THREE.Color(0xc9d6e6);
     for (const k of World.kickers) {
-      const nu = 14, nv = 8, base = pos.length / 3;
+      const nv = 8, base = pos.length / 3;
       const hw = k.w / 2 + 0.9;
+      // even rows plus a few tight ones round the lip, so the painted lip line stays a thin stripe
+      const L = k.len + k.back, us = [];
+      for (let iu = 0; iu <= 14; iu++) us.push((iu / 14) * L);
+      for (const d of [-0.5, -0.18, 0, 0.18, 0.5]) us.push(k.len + d);
+      us.sort((a, b) => a - b);
+      const nu = us.length - 1;
       for (let iu = 0; iu <= nu; iu++) {
-        const u = (iu / nu) * (k.len + k.back);
+        const u = us[iu];
         for (let iv = 0; iv <= nv; iv++) {
           const v = -hw + (iv / nv) * hw * 2;
           const x = k.x0 + k.dx * u - k.dz * v, z = k.z0 + k.dz * u + k.dx * v;
           const y = World.height(x, z) + World.kickerOffset(k, x, z) + 0.03;
           pos.push(x, y, z);
-          const lipLine = Math.abs(u - k.len) < k.len / nu * 0.6 && Math.abs(v) < k.w / 2;
+          const lipLine = Math.abs(u - k.len) < 0.1 && Math.abs(v) < k.w / 2;
           const c = lipLine ? cLip : (Math.abs(v) > k.w / 2 ? cSide : cSnow);
           col.push(c.r, c.g, c.b);
         }

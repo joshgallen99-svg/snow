@@ -144,6 +144,17 @@ kbd { display: inline-block; min-width: 18px; padding: 2px 7px; border-radius: 6
 #balance.sweet .bl-zone { background: rgba(89,211,140,.5); }
 #balance .bl-needle { position: absolute; top: -5px; width: 4px; height: 22px; margin-left: -2px; border-radius: 3px; background: #fff; box-shadow: 0 0 0 2px rgba(15,26,44,.85), 0 0 12px rgba(255,255,255,.7); }
 #balance.danger .bl-needle { background: var(--bad); box-shadow: 0 0 0 2px rgba(15,26,44,.85), 0 0 14px rgba(255,107,94,.9); }
+#perfect { position: absolute; left: 50%; top: 27%; transform: translateX(-50%); text-align: center; white-space: nowrap; text-shadow: 0 2px 4px rgba(0,0,0,.5), 0 3px 18px rgba(0,0,0,.45); }
+#perfect .pl-t { font-size: 40px; font-weight: 800; font-style: italic; letter-spacing: .04em; text-transform: uppercase; color: var(--amber); }
+#perfect .pl-s { font-size: 20px; font-weight: 700; margin-top: 2px; }
+#perfect .pl-s em { font-style: normal; font-weight: 600; color: #e4eaf2; font-size: 14px; margin-left: 10px; }
+#perfect.go { animation: plIn 1.5s cubic-bezier(.2,1.5,.4,1) forwards; }
+@keyframes plIn { 0% { opacity: 0; transform: translateX(-50%) scale(.6); } 14% { opacity: 1; transform: translateX(-50%) scale(1.08); } 24% { transform: translateX(-50%) scale(1); } 78% { opacity: 1; transform: translateX(-50%) translateY(0); } 100% { opacity: 0; transform: translateX(-50%) translateY(-18px); } }
+#boostFlash { position: absolute; inset: 0; opacity: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(242,177,74,.38) 100%); }
+#boostFlash.go { animation: bf .7s ease-out; }
+@keyframes bf { 0% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { #perfect.go { animation: none; } #boostFlash.go { animation: none; } }
+@media (max-width: 640px) { #perfect .pl-t { font-size: 28px; } }
 #prompt { position: absolute; left: 50%; bottom: 26%; transform: translateX(-50%); padding: 10px 16px; font-weight: 600; }
 
 /* map UI */
@@ -229,7 +240,7 @@ kbd { display: inline-block; min-width: 18px; padding: 2px 7px; border-radius: 6
 <section id="title" class="glass" hidden>
   <div class="kanji" aria-hidden="true">北風</div>
   <h1>Kitakaze Peak</h1>
-  <p>A volcano resort in deep snow country. Nine lifts, seventeen runs, and all the powder you can find.</p>
+  <p>A volcano resort in deep snow country. Ten lifts, twenty-one runs, and all the powder you can find.</p>
   <div class="menu">
     <button class="btn primary" id="bRide"><span>Ride the mountain</span><span>Live cam</span></button>
     <button class="btn" id="bLocker"><span>Gear locker</span><span id="bLockerNote">Boards &amp; outfits</span></button>
@@ -265,10 +276,9 @@ kbd { display: inline-block; min-width: 18px; padding: 2px 7px; border-radius: 6
     <label for="sMusic">Music volume</label><input type="range" id="sMusic" min="0" max="1" step="0.05">
     <label for="sSfx">Sound effects</label><input type="range" id="sSfx" min="0" max="1" step="0.05">
     <label for="sQuality">Graphics quality</label><select id="sQuality"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select>
-    <label for="sTime">Time of day</label><select id="sTime"><option value="cycle">Cycle through the day</option><option value="7">Dawn</option><option value="11.5">Midday</option><option value="16.6">Golden hour</option><option value="20.5">Night skiing</option></select>
+    <label for="sTime">Time of day</label><select id="sTime"><option value="11.5">Day</option><option value="16.6">Sunset</option><option value="20.5">Night</option></select>
     <label for="sWeather">Weather</label><select id="sWeather"><option value="auto">Changes over time</option><option value="clear">Bluebird</option><option value="cloudy">Overcast</option><option value="snow">Snowing</option><option value="storm">Whiteout</option></select>
     <label for="sStance">Stance</label><select id="sStance"><option value="1">Regular (left foot forward)</option><option value="-1">Goofy (right foot forward)</option></select>
-    <label for="sCine">Cinematic jump camera</label><select id="sCine"><option value="1">On</option><option value="0">Off</option></select>
     <label for="sGhost">Race your best-run ghost</label><select id="sGhost"><option value="0">Off</option><option value="1">On</option></select>
     <label for="sUnlock">Unlock every lift</label><select id="sUnlock"><option value="0">No, earn them</option><option value="1">Yes</option></select>
     <label for="sReset">Progress</label><button class="btn small" id="sReset">Reset progress</button>
@@ -285,6 +295,7 @@ kbd { display: inline-block; min-width: 18px; padding: 2px 7px; border-radius: 6
     <div><kbd>W</kbd> / <kbd>↑</kbd></div><div>Tuck for speed. In the air: frontflip. On flats: skate.</div>
     <div><kbd>S</kbd> / <kbd>↓</kbd></div><div>Skid to slow down. In the air: backflip.</div>
     <div><kbd>Space</kbd></div><div>Hold to crouch, release to ollie. Release right at the edge of a kicker lip for a perfect pop: more speed and height. Jump off rails.</div>
+    <div>Landing</div><div>Land clean (board pointing where you are going, flip finished, grabs let go) for a perfect landing and a speed boost. The longer the air, the bigger the boost.</div>
     <div>Rails and boxes</div><div>Touch one and you snap on. Keep the balance needle near the middle with <kbd>A</kbd> and <kbd>D</kbd>: it wanders off on its own. Let it reach the edge and you slip off.</div>
     <div><kbd>Q</kbd> / <kbd>F</kbd></div><div>Press the front or back of the board into the snow. Add <kbd>A</kbd> or <kbd>D</kbd> to butter-spin on it. Ollie off a nose press for a nollie.</div>
     <div>On a rail</div><div><kbd>W</kbd> switches up 180, <kbd>S</kbd> switches between 50-50 and boardslide, <kbd>Q</kbd> / <kbd>F</kbd> press for nose and tail slides. Spin onto a rail and off it for 270-ons and spin-outs.</div>
@@ -324,6 +335,8 @@ kbd { display: inline-block; min-width: 18px; padding: 2px 7px; border-radius: 6
   </div>
   <div id="tricks"></div>
   <div id="combo"></div>
+  <div id="boostFlash"></div>
+  <div id="perfect" hidden aria-live="polite"></div>
   <div id="msg"></div>
   <div id="prompt" class="glass" hidden></div>
   <div id="balance" class="glass" hidden aria-label="Rail balance">
@@ -574,6 +587,7 @@ const LIFTS = [
   { id: 'summit',   name: 'Summit T-Bar',      type: 'tbar',    a: [60, -700],   b: [100, -905],   unlock: 7, color: 0x8a6d3b },
   // the back side: a quad up the north face from its own little base
   { id: 'kita',     name: 'Kita Back Quad',    type: 'quad',    a: [273, -1425], b: [122, -1027], unlock: 4, color: 0x7a3f8f },
+  { id: 'nishi',    name: 'Nishi Back Six',    type: 'six',     a: [-560, -1430], b: [-150, -1075], unlock: 6, color: 0x2f7a5a },
 ];
 
 // Feature positions use t = fraction of run length.
@@ -809,6 +823,62 @@ RUNS.push(
       { k: 'halfpipe', t0: 0.05, t1: 0.92, h: 3.8 },
       { k: 'rollers', t0: 0.4, t1: 0.55, amp: 0.9, wl: 28 },
       { k: 'log', t: 0.7, len: 8, lat: 0, h: 0.45 },
+    ],
+  },
+  {
+    id: 'serpent', name: 'Serpent', diff: 'red', lift: 'nishi', w: 20, groomed: true, bank: 1.5,
+    blurb: 'A banked groomer that snakes back and forth down the north-west face, with a jump line and side hits. Lit at night.',
+    pts: [[-175, -1090], [-287, -1068], [-249, -1179], [-425, -1251], [-447, -1349], [-571, -1388], [-545, -1420]],
+    features: [
+      { k: 'forest', t0: 0, t1: 1, d: 0.8 },
+      { k: 'rollers', t0: 0.06, t1: 0.2, amp: 1.1, wl: 26 },
+      { k: 'kicker', t: 0.24, size: 1, lat: -5 },
+      { k: 'sidehits', t0: 0.62, t1: 0.96, gap: 34, h: 1.4 },
+      { k: 'kicker', t: 0.43, size: 1, lat: 3 },
+      { k: 'log', t: 0.7, len: 9, lat: -8, ang: 0.25 },
+      { k: 'kicker', t: 0.81, size: 1, lat: 0 },
+      { k: 'lamps', t0: 0, t1: 1, gap: 50 },
+    ],
+  },
+  {
+    id: 'shirakaba', name: 'Shirakaba', diff: 'black', lift: 'nishi', w: 34, groomed: false, bank: 0.2,
+    blurb: 'Steep birch glades straight down the fall line: pillows, rock drops and bottomless snow.',
+    pts: [[-140, -1095], [-170, -1200], [-140, -1300], [-230, -1380], [-400, -1440], [-540, -1445]],
+    features: [
+      { k: 'forest', t0: 0, t1: 1, d: 0.9 },
+      { k: 'glade', t0: 0.05, t1: 0.95, d: 0.45 },
+      { k: 'powder', t0: 0, t1: 1 },
+      { k: 'pillows', t0: 0.1, t1: 0.7, d: 0.34, h: 1.2 },
+      { k: 'rocks', t0: 0.15, t1: 0.6, n: 7 },
+      { k: 'drop', t: 0.33, h: 2.5 },
+      { k: 'log', t: 0.5, len: 10, lat: 9, ang: -0.4 },
+      { k: 'drop', t: 0.62, h: 2 },
+    ],
+  },
+  {
+    id: 'yoko', name: 'Yoko Traverse', diff: 'green', lift: 'nishi', w: 12, groomed: true, bank: 1.2, cattrack: true,
+    blurb: 'The long way down: a cat track that sweeps right across the west face and back, over every other run.',
+    pts: [[-185, -1070], [-423, -965], [-383, -1211], [-536, -1136], [-519, -1390], [-520, -1457], [-580, -1448]],
+    features: [
+      { k: 'forest', t0: 0, t1: 1, d: 0.85 },
+      { k: 'sidehits', t0: 0.05, t1: 0.95, gap: 40, h: 1.0 },
+      { k: 'box', t: 0.33, len: 12, lat: 0 },
+      { k: 'log', t: 0.55, len: 8, lat: 6, ang: 0.2 },
+      { k: 'rollers', t0: 0.7, t1: 0.8, amp: 0.7, wl: 24 },
+      { k: 'lamps', t0: 0, t1: 1, gap: 70 },
+    ],
+  },
+  {
+    id: 'tanuki', name: 'Tanuki Gully', diff: 'red', lift: 'nishi', w: 15, groomed: false, bank: 1.6,
+    blurb: 'A deep natural halfpipe curling round the western edge. Carve the walls and air out of the lip.',
+    pts: [[-190, -1080], [-329, -1039], [-489, -1067], [-546, -1155], [-610, -1259], [-591, -1297], [-578, -1438]],
+    features: [
+      { k: 'forest', t0: 0, t1: 1, d: 0.9 },
+      { k: 'halfpipe', t0: 0.06, t1: 0.9, h: 4.2 },
+      { k: 'powder', t0: 0, t1: 1 },
+      { k: 'rollers', t0: 0.5, t1: 0.62, amp: 1.0, wl: 26 },
+      { k: 'drop', t: 0.75, h: 2 },
+      { k: 'log', t: 0.4, len: 8, lat: 0, h: 0.45 },
     ],
   },
 );
@@ -2347,8 +2417,8 @@ const TerrainMesh = {
           vec3 cellP = floor(vWPos * 22.0);
           float rnd = th(cellP.xz + cellP.y * 7.13 + floor(V.xz * 6.0));
           float spec = pow(max(dot(normalize(vWNrm), Hh), 0.0), 18.0);
-          float spark = step(0.9965, rnd) * spec * (1.0 - smoothstep(10.0, 70.0, length(vWPos - cameraPosition)));
-          outgoingLight += uSunColor * spark * 3.5 * (1.0 - vData.w) * (1.0 - clamp(vComp, 0.0, 1.0)) * max(uSunDir.y, 0.0);
+          float spark = step(0.993, rnd) * spec * (1.0 - smoothstep(15.0, 120.0, length(vWPos - cameraPosition)));
+          outgoingLight += uSunColor * spark * 5.0 * (1.0 - vData.w) * (1.0 - clamp(vComp, 0.0, 1.0)) * max(uSunDir.y, 0.0);
         }
       `,
     });
@@ -2388,7 +2458,7 @@ const TerrainMesh = {
         #include <normal_fragment_maps>
         {
           float camD2 = length(vWPos - cameraPosition);
-          float near = 1.0 - smoothstep(14.0, 40.0, camD2);
+          float near = 1.0 - smoothstep(25.0, 75.0, camD2);
           float th1 = vData2.x; vec2 dT = vec2(cos(th1), sin(th1)); vec2 dN = vec2(-dT.y, dT.x);
           float q2 = dot(vWPos.xz, dN);
           float cord = sin(q2 * 6.2831 / 0.11) * vData.x * (1.0 - smoothstep(5.0, 22.0, camD2)) * 0.2;
@@ -2397,7 +2467,9 @@ const TerrainMesh = {
           float rip = (vnoise(rp) - 0.5 + (vnoise(rp * 3.1) - 0.5) * 0.4) * (1.0 - vData.x) * (0.25 + vData.y * 0.4) * (1.0 - smoothstep(20.0, 90.0, camD2));
           // fine grain: small lumps you only see up close
           float g1 = vnoise(vWPos.xz * 6.0) - 0.5, g2 = vnoise(vWPos.zx * 6.0 + 11.0) - 0.5;
-          vec3 pw = vec3(dN.x, 0.0, dN.y) * cord + vec3(0.6, 0.0, 0.3) * rip + vec3(g1, 0.0, g2) * 0.12 * near * (1.0 - vData.w);
+          // and a coarser crust a hand's width across: the surface reads rough, not plastic
+          float g3 = vnoise(vWPos.xz * 1.9 + 5.0) - 0.5, g4 = vnoise(vWPos.zx * 1.9 + 23.0) - 0.5;
+          vec3 pw = vec3(dN.x, 0.0, dN.y) * cord + vec3(0.6, 0.0, 0.3) * rip + vec3(g1 + g3 * 0.8, 0.0, g2 + g4 * 0.8) * 0.26 * near * (1.0 - vData.w);
           ${overlay ? `
           // crisp groove walls from the compaction map
           {
@@ -2410,8 +2482,8 @@ const TerrainMesh = {
           normal = normalize(normal + (viewMatrix * vec4(pw, 0.0)).xyz);
         }
       `).replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-        roughnessFactor = mix(0.92, 0.72, vData.x); roughnessFactor = mix(roughnessFactor, 0.45, vData.w);
-        roughnessFactor = mix(roughnessFactor, 0.62, clamp(vComp, 0.0, 1.0));`);
+        roughnessFactor = mix(0.62, 0.5, vData.x); roughnessFactor = mix(roughnessFactor, 0.45, vData.w);
+        roughnessFactor = mix(roughnessFactor, 0.48, clamp(vComp, 0.0, 1.0));`);
     };
     if (overlay) {
       mat.polygonOffset = true; mat.polygonOffsetFactor = -1; mat.polygonOffsetUnits = -2;
@@ -3345,16 +3417,22 @@ const Structures = {
     const pos = [], col = [], idx = [];
     const cSnow = new THREE.Color(0xe8eef6), cLip = new THREE.Color(0x2f7bd8), cSide = new THREE.Color(0xc9d6e6);
     for (const k of World.kickers) {
-      const nu = 14, nv = 8, base = pos.length / 3;
+      const nv = 8, base = pos.length / 3;
       const hw = k.w / 2 + 0.9;
+      // even rows plus a few tight ones round the lip, so the painted lip line stays a thin stripe
+      const L = k.len + k.back, us = [];
+      for (let iu = 0; iu <= 14; iu++) us.push((iu / 14) * L);
+      for (const d of [-0.5, -0.18, 0, 0.18, 0.5]) us.push(k.len + d);
+      us.sort((a, b) => a - b);
+      const nu = us.length - 1;
       for (let iu = 0; iu <= nu; iu++) {
-        const u = (iu / nu) * (k.len + k.back);
+        const u = us[iu];
         for (let iv = 0; iv <= nv; iv++) {
           const v = -hw + (iv / nv) * hw * 2;
           const x = k.x0 + k.dx * u - k.dz * v, z = k.z0 + k.dz * u + k.dx * v;
           const y = World.height(x, z) + World.kickerOffset(k, x, z) + 0.03;
           pos.push(x, y, z);
-          const lipLine = Math.abs(u - k.len) < k.len / nu * 0.6 && Math.abs(v) < k.w / 2;
+          const lipLine = Math.abs(u - k.len) < 0.1 && Math.abs(v) < k.w / 2;
           const c = lipLine ? cLip : (Math.abs(v) > k.w / 2 ? cSide : cSnow);
           col.push(c.r, c.g, c.b);
         }
@@ -4800,6 +4878,13 @@ const Player = {
     this.flip = 0; this.flipVel = 0; this.spinVel = 0;
     this.crouch = Math.min(1, 0.4 + hard * 0.05);
     if (Math.abs(this.tweakR) + Math.abs(this.tweakP) > 0.25 && A.grab) { this.vel.multiplyScalar(0.92); }
+    // a clean touchdown (board lined up with the travel, flip finished, grab let go, not too hard)
+    // after real air gives a push: more air, more speed; a perfect pop off the lip adds a bit more
+    if (!sketch && !A.grab && A.t > 0.45 && mis < 0.22 && flipRes < 0.35 && hard < 17 && speedT > 2) {
+      const gain = Math.min(5.5, (0.5 + A.t * 1.5) * (A.perfect ? 1.25 : 1));
+      this.vel.multiplyScalar((speedT * keep + gain) / Math.max(0.1, speedT * keep));
+      this.emit('perfectLand', { air: A.t, gain });
+    }
     this.emit('land', { impact: hard, air: A.t, sketch });
     if (typeof Snow !== 'undefined') Snow.stampLanding(this, hard);
     this.scoreTrick(A, sketch);
@@ -5081,7 +5166,7 @@ const OVERCAST = { zen: 0x9aa6b4, hor: 0xc9d0d8, fog: 0xc4cbd3, hs: 0xc2cad4, hg
 const OVERCAST_NIGHT = { zen: 0x161c28, hor: 0x2a3242, fog: 0x2a3242, hs: 0x4c5668, hg: 0x262c38 };
 
 const Sky = {
-  time: 9.2, dayLength: 24 * 60, cycle: true,
+  time: 11.5, dayLength: 24 * 60, cycle: false,
   weather: { overcast: 0, snow: 0, wind: 0.2, target: { overcast: 0, snow: 0, wind: 0.2 }, state: 'clear', next: 200 },
   night: 0, sunE: 0.5, sunDir: new V3(), moonDir: new V3(),
   dome: null, sun: null, hemi: null, snowPts: null, exposure: 0.9, fogColor: new THREE.Color(),
@@ -6554,17 +6639,16 @@ const Cam = {
     const want = sp > 2 ? vh.normalize() : new V3(Math.sin(pl.yaw) * pl.ride, 0, Math.cos(pl.yaw) * pl.ride);
     const a0 = Math.atan2(this.dir.x, this.dir.z), a1 = Math.atan2(want.x, want.z);
     // follow the direction of travel (spins don't change it, so the camera never swings with them)
-    const a = dampAngle(a0, a1, pl.ground || pl.grind ? 3.2 : 1.8, dt);
+    const a = dampAngle(a0, a1, 3.2, dt);
     this.dir.set(Math.sin(a), 0, Math.cos(a));
     const speed = pl.vel.length();
     const fast = sstep(8, 30, speed);
     const airborne = !pl.ground && !pl.grind && !pl.crashed;
-    this.airK = damp(this.airK || 0, airborne ? 1 : 0, airborne ? 2.5 : 4, dt);
-    // in the air the camera rises and backs off a little so you can see the rider and the landing
-    const dist = 5.2 + speed * 0.04 + this.airK * 1.4, height = 1.9 - fast * 0.55 + this.airK * 1.0;
+    // jumps don't move the camera: it behaves exactly as on the ground, so landings stay readable
+    this.airK = 0;
+    const dist = 5.6 + speed * 0.04, height = 2.7 - fast * 0.55;
     // track the rider's height closely: a touch of lag in the air, none on the ground
-    if (this.camY == null || !airborne) this.camY = pl.pos.y;
-    else this.camY = damp(this.camY, pl.pos.y, 6, dt);
+    this.camY = pl.pos.y;
     const base = new V3(pl.pos.x, this.camY + 1.1, pl.pos.z);
     out.pos.copy(base).addScaledVector(this.dir, -dist).add(new V3(0, height, 0));
     // stay well above the snow (the fresh layer can be 60 cm deep), uphill of the rider included
@@ -6631,6 +6715,7 @@ const Cam = {
     return out;
   },
   startCine(pl) {
+    return; // no cinematic jump camera: it made landings harder
     if (!this.cineOn) return;
     const vy = pl.vel.y, t = Math.max(0, (vy + Math.sqrt(Math.max(0, vy * vy + 2 * 9.81 * 3))) / 9.81);
     if (t < 1.05) return;
@@ -7299,7 +7384,6 @@ const UI = {
     on('sTime', (v) => (S().time = v));
     on('sWeather', (v) => (S().weather = v));
     on('sStance', (v) => (S().stance = +v));
-    on('sCine', (v) => (S().cine = v === '1'));
     on('sGhost', (v) => (S().ghost = v === '1'));
     on('sUnlock', (v) => (S().unlockAll = v === '1'));
     let armed = false;
@@ -7311,7 +7395,7 @@ const UI = {
   syncSettings() {
     const s = Game.settings;
     $('sMusic').value = s.music; $('sSfx').value = s.sfx; $('sQuality').value = s.quality; $('sTime').value = s.time;
-    $('sWeather').value = s.weather; $('sStance').value = String(s.stance); $('sCine').value = s.cine ? '1' : '0';
+    $('sWeather').value = s.weather; $('sStance').value = String(s.stance);
     $('sGhost').value = s.ghost ? '1' : '0'; $('sUnlock').value = s.unlockAll ? '1' : '0';
   },
 
@@ -7364,6 +7448,15 @@ const UI = {
     while (box.children.length > 4) box.lastChild.remove();
     setTimeout(() => d.classList.add('out'), 2200);
     setTimeout(() => d.remove(), 2800);
+  },
+  // centre-screen banner with the speed it gave you; the screen edges flash warm for a moment
+  perfectLanding(kmh, air) {
+    const el = $('perfect');
+    el.innerHTML = `<div class="pl-t">Perfect landing</div><div class="pl-s num">+${Math.round(kmh)} km/h<em>${air.toFixed(1)} s air</em></div>`;
+    el.hidden = false; el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
+    const f = $('boostFlash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
+    clearTimeout(this._plT);
+    this._plT = setTimeout(() => (el.hidden = true), 1500);
   },
   message(big, small = '', ms = 1800) {
     const el = $('msg');
@@ -7458,7 +7551,7 @@ const Game = {
   defaults() {
     return {
       v: 3, done: {}, best: {}, tokens: [], gear: { board: 'blackout', jacket: 'onyx', pants: 'jet', helmet: 'black', goggles: 'red' },
-      settings: { music: 0.5, sfx: 0.8, quality: 'high', time: 'cycle', weather: 'auto', stance: 1, cine: false, ghost: false, unlockAll: false },
+      settings: { music: 0.5, sfx: 0.8, quality: 'high', time: '11.5', weather: 'auto', stance: 1, cine: false, ghost: false, unlockAll: false },
       ghosts: {},
     };
   },
@@ -7582,7 +7675,9 @@ const Game = {
   applySettings() {
     const s = this.settings;
     Sound.setVolumes(s.music, s.sfx);
-    if (s.time === 'cycle') Sky.cycle = true; else { Sky.cycle = false; Sky.time = +s.time; }
+    // time of day is picked in settings and stays put
+    if (!['11.5', '16.6', '20.5'].includes(String(s.time))) s.time = '11.5';
+    Sky.cycle = false; Sky.time = +s.time;
     Sky.autoWeather = s.weather === 'auto';
     if (s.weather !== 'auto' && Sky.weather.state !== s.weather) Sky.setWeather(s.weather, !this.weatherApplied);
     this.weatherApplied = true;
@@ -7877,6 +7972,7 @@ const Game = {
       else if (e.type === 'grindStart') { Sound.grind(true); Cam.kick(0.15); }
       else if (e.type === 'lostBalance') { UI.message('Lost your balance', '', 1100); Sound.bump(); }
       else if (e.type === 'railPop') Sound.pop();
+      else if (e.type === 'perfectLand') { UI.perfectLanding(e.gain * 3.6, e.air); Sound.chime(9); Cam.kick(0.25); }
       else if (e.type === 'perfectPop') { UI.trick({ name: 'Perfect pop', pts: 0, mult: 1, pop: true }); Sound.chime(7); Cam.kick(0.2); }
       else if (e.type === 'comboEnd' && e.n > 1) UI.toast(`Combo ×${e.n} banked · ${e.pts.toLocaleString()} points`, 1800);
       else if (e.type === 'comboLost' && e.pts > 0) UI.toast(`Combo lost (${e.pts.toLocaleString()})`, 1600);

@@ -43,6 +43,7 @@ const LIFTS = [
   { id: 'summit',   name: 'Summit T-Bar',      type: 'tbar',    a: [60, -700],   b: [100, -905],   unlock: 7, color: 0x8a6d3b },
   // the back side: a quad up the north face from its own little base
   { id: 'kita',     name: 'Kita Back Quad',    type: 'quad',    a: [273, -1425], b: [122, -1027], unlock: 4, color: 0x7a3f8f },
+  { id: 'nishi',    name: 'Nishi Back Six',    type: 'six',     a: [-560, -1430], b: [-150, -1075], unlock: 6, color: 0x2f7a5a },
 ];
 
 // Feature positions use t = fraction of run length.
@@ -278,6 +279,62 @@ RUNS.push(
       { k: 'halfpipe', t0: 0.05, t1: 0.92, h: 3.8 },
       { k: 'rollers', t0: 0.4, t1: 0.55, amp: 0.9, wl: 28 },
       { k: 'log', t: 0.7, len: 8, lat: 0, h: 0.45 },
+    ],
+  },
+  {
+    id: 'serpent', name: 'Serpent', diff: 'red', lift: 'nishi', w: 20, groomed: true, bank: 1.5,
+    blurb: 'A banked groomer that snakes back and forth down the north-west face, with a jump line and side hits. Lit at night.',
+    pts: [[-175, -1090], [-287, -1068], [-249, -1179], [-425, -1251], [-447, -1349], [-571, -1388], [-545, -1420]],
+    features: [
+      { k: 'forest', t0: 0, t1: 1, d: 0.8 },
+      { k: 'rollers', t0: 0.06, t1: 0.2, amp: 1.1, wl: 26 },
+      { k: 'kicker', t: 0.24, size: 1, lat: -5 },
+      { k: 'sidehits', t0: 0.62, t1: 0.96, gap: 34, h: 1.4 },
+      { k: 'kicker', t: 0.43, size: 1, lat: 3 },
+      { k: 'log', t: 0.7, len: 9, lat: -8, ang: 0.25 },
+      { k: 'kicker', t: 0.81, size: 1, lat: 0 },
+      { k: 'lamps', t0: 0, t1: 1, gap: 50 },
+    ],
+  },
+  {
+    id: 'shirakaba', name: 'Shirakaba', diff: 'black', lift: 'nishi', w: 34, groomed: false, bank: 0.2,
+    blurb: 'Steep birch glades straight down the fall line: pillows, rock drops and bottomless snow.',
+    pts: [[-140, -1095], [-170, -1200], [-140, -1300], [-230, -1380], [-400, -1440], [-540, -1445]],
+    features: [
+      { k: 'forest', t0: 0, t1: 1, d: 0.9 },
+      { k: 'glade', t0: 0.05, t1: 0.95, d: 0.45 },
+      { k: 'powder', t0: 0, t1: 1 },
+      { k: 'pillows', t0: 0.1, t1: 0.7, d: 0.34, h: 1.2 },
+      { k: 'rocks', t0: 0.15, t1: 0.6, n: 7 },
+      { k: 'drop', t: 0.33, h: 2.5 },
+      { k: 'log', t: 0.5, len: 10, lat: 9, ang: -0.4 },
+      { k: 'drop', t: 0.62, h: 2 },
+    ],
+  },
+  {
+    id: 'yoko', name: 'Yoko Traverse', diff: 'green', lift: 'nishi', w: 12, groomed: true, bank: 1.2, cattrack: true,
+    blurb: 'The long way down: a cat track that sweeps right across the west face and back, over every other run.',
+    pts: [[-185, -1070], [-423, -965], [-383, -1211], [-536, -1136], [-519, -1390], [-520, -1457], [-580, -1448]],
+    features: [
+      { k: 'forest', t0: 0, t1: 1, d: 0.85 },
+      { k: 'sidehits', t0: 0.05, t1: 0.95, gap: 40, h: 1.0 },
+      { k: 'box', t: 0.33, len: 12, lat: 0 },
+      { k: 'log', t: 0.55, len: 8, lat: 6, ang: 0.2 },
+      { k: 'rollers', t0: 0.7, t1: 0.8, amp: 0.7, wl: 24 },
+      { k: 'lamps', t0: 0, t1: 1, gap: 70 },
+    ],
+  },
+  {
+    id: 'tanuki', name: 'Tanuki Gully', diff: 'red', lift: 'nishi', w: 15, groomed: false, bank: 1.6,
+    blurb: 'A deep natural halfpipe curling round the western edge. Carve the walls and air out of the lip.',
+    pts: [[-190, -1080], [-329, -1039], [-489, -1067], [-546, -1155], [-610, -1259], [-591, -1297], [-578, -1438]],
+    features: [
+      { k: 'forest', t0: 0, t1: 1, d: 0.9 },
+      { k: 'halfpipe', t0: 0.06, t1: 0.9, h: 4.2 },
+      { k: 'powder', t0: 0, t1: 1 },
+      { k: 'rollers', t0: 0.5, t1: 0.62, amp: 1.0, wl: 26 },
+      { k: 'drop', t: 0.75, h: 2 },
+      { k: 'log', t: 0.4, len: 8, lat: 0, h: 0.45 },
     ],
   },
 );

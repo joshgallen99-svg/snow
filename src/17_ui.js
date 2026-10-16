@@ -96,7 +96,6 @@ const UI = {
     on('sTime', (v) => (S().time = v));
     on('sWeather', (v) => (S().weather = v));
     on('sStance', (v) => (S().stance = +v));
-    on('sCine', (v) => (S().cine = v === '1'));
     on('sGhost', (v) => (S().ghost = v === '1'));
     on('sUnlock', (v) => (S().unlockAll = v === '1'));
     let armed = false;
@@ -108,7 +107,7 @@ const UI = {
   syncSettings() {
     const s = Game.settings;
     $('sMusic').value = s.music; $('sSfx').value = s.sfx; $('sQuality').value = s.quality; $('sTime').value = s.time;
-    $('sWeather').value = s.weather; $('sStance').value = String(s.stance); $('sCine').value = s.cine ? '1' : '0';
+    $('sWeather').value = s.weather; $('sStance').value = String(s.stance);
     $('sGhost').value = s.ghost ? '1' : '0'; $('sUnlock').value = s.unlockAll ? '1' : '0';
   },
 
@@ -161,6 +160,15 @@ const UI = {
     while (box.children.length > 4) box.lastChild.remove();
     setTimeout(() => d.classList.add('out'), 2200);
     setTimeout(() => d.remove(), 2800);
+  },
+  // centre-screen banner with the speed it gave you; the screen edges flash warm for a moment
+  perfectLanding(kmh, air) {
+    const el = $('perfect');
+    el.innerHTML = `<div class="pl-t">Perfect landing</div><div class="pl-s num">+${Math.round(kmh)} km/h<em>${air.toFixed(1)} s air</em></div>`;
+    el.hidden = false; el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
+    const f = $('boostFlash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
+    clearTimeout(this._plT);
+    this._plT = setTimeout(() => (el.hidden = true), 1500);
   },
   message(big, small = '', ms = 1800) {
     const el = $('msg');
