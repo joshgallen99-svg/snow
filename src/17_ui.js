@@ -47,6 +47,7 @@ const UI = {
     const S = Game.save;
     $('tFlakes').textContent = Game.flakeCount();
     $('tRuns').textContent = Object.keys(S.done).length;
+    $('tRunsAll').textContent = RUNS.length;
     const n = Object.keys(S.best).length;
     $('bRecNote').textContent = n ? `${n} best time${n === 1 ? '' : 's'}` : 'No times yet';
   },

@@ -237,7 +237,7 @@ kbd { display: inline-block; min-width: 18px; padding: 2px 7px; border-radius: 6
     <button class="btn" id="bSettings"><span>Settings</span><span></span></button>
     <button class="btn" id="bControls"><span>Controls</span><span>Keyboard &amp; touchpad</span></button>
   </div>
-  <div class="foot"><div>Snowflakes <b id="tFlakes" class="num">0</b></div><div>Runs ridden <b id="tRuns" class="num">0</b> / 13</div></div>
+  <div class="foot"><div>Snowflakes <b id="tFlakes" class="num">0</b></div><div>Runs ridden <b id="tRuns" class="num">0</b> / <span id="tRunsAll">17</span></div></div>
 </section>
 
 <section id="locker" class="panel glass" hidden>
@@ -7249,6 +7249,7 @@ const UI = {
     const S = Game.save;
     $('tFlakes').textContent = Game.flakeCount();
     $('tRuns').textContent = Object.keys(S.done).length;
+    $('tRunsAll').textContent = RUNS.length;
     const n = Object.keys(S.best).length;
     $('bRecNote').textContent = n ? `${n} best time${n === 1 ? '' : 's'}` : 'No times yet';
   },
