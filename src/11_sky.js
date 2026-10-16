@@ -176,39 +176,47 @@ const Sky = {
   },
 
   initSnow(scene) {
-    const N = 9000, pos = new Float32Array(N * 3), rnd = mulberry32(5), seed = new Float32Array(N);
-    for (let i = 0; i < N; i++) { pos[i * 3] = rnd() * 140; pos[i * 3 + 1] = rnd() * 70; pos[i * 3 + 2] = rnd() * 140; seed[i] = rnd(); }
+    // most flakes fill a big box around the camera; the last few thousand stay close, big and soft
+    const N = 20000, NEAR = 4000, pos = new Float32Array(N * 3), rnd = mulberry32(5), seed = new Float32Array(N), near = new Float32Array(N);
+    for (let i = 0; i < N; i++) { pos[i * 3] = rnd() * 70; pos[i * 3 + 1] = rnd() * 40; pos[i * 3 + 2] = rnd() * 70; seed[i] = rnd(); near[i] = i >= N - NEAR ? 1 : 0; }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
+    g.setAttribute('aNear', new THREE.BufferAttribute(near, 1));
     this.snowU = { uTime: U.uTime, uCam: { value: new V3() }, uAmt: { value: 0 }, uWind: { value: new THREE.Vector2(0.6, 0.2) }, uCol: { value: new THREE.Color(1, 1, 1) }, uPx: { value: 1 } };
     const m = new THREE.ShaderMaterial({
       uniforms: Object.assign(this.snowU, THREE.UniformsUtils.clone(THREE.UniformsLib.fog)), transparent: true, depthWrite: false, fog: true,
       vertexShader: /* glsl */`
-        attribute float aSeed; uniform float uTime, uAmt, uPx; uniform vec3 uCam; uniform vec2 uWind;
-        varying float vA;
+        attribute float aSeed, aNear; uniform float uTime, uAmt, uPx; uniform vec3 uCam; uniform vec2 uWind;
+        varying float vA; varying float vSoft;
         #include <fog_pars_vertex>
         void main(){
-          vec3 box = vec3(140.0, 70.0, 140.0);
-          vec3 p = position;
+          vec3 box = mix(vec3(70.0, 40.0, 70.0), vec3(16.0, 10.0, 16.0), aNear);
+          vec3 p = position * mix(1.0, 16.0 / 70.0, aNear);
           float fall = 1.4 + aSeed * 1.2;
+          // wind drives the flakes sideways; in a storm they go nearly horizontal and swirl
+          float gust = 1.0 + 0.6 * sin(uTime * 0.7 + aSeed * 6.0);
           p.y -= uTime * fall;
-          p.x += uTime * uWind.x * (3.0 + aSeed * 2.0) + sin(uTime * (0.6 + aSeed) + aSeed * 30.0) * 1.2;
-          p.z += uTime * uWind.y * (3.0 + aSeed * 2.0) + cos(uTime * (0.5 + aSeed) + aSeed * 20.0) * 1.2;
+          p.x += uTime * uWind.x * (4.0 + aSeed * 3.0) * gust + sin(uTime * (0.6 + aSeed) + aSeed * 30.0) * 1.2;
+          p.z += uTime * uWind.y * (4.0 + aSeed * 3.0) * gust + cos(uTime * (0.5 + aSeed) + aSeed * 20.0) * 1.2;
           p = mod(p - uCam + box * 0.5, box) + uCam - box * 0.5;
           vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
           gl_Position = projectionMatrix * mvPosition;
           float vis = step(aSeed, uAmt);
-          gl_PointSize = vis * uPx * (0.06 + aSeed * 0.05) * 300.0 / -mvPosition.z;
-          vA = vis * smoothstep(1.0, 4.0, -mvPosition.z);
+          float sz = mix(0.2 + aSeed * 0.12, 0.06 + aSeed * 0.05, aNear);
+          gl_PointSize = vis * uPx * sz * 900.0 / -mvPosition.z;
+          gl_PointSize = max(gl_PointSize, vis * 1.2);
+          vSoft = aNear;
+          vA = vis * smoothstep(mix(1.0, 0.4, aNear), mix(4.0, 1.2, aNear), -mvPosition.z) * mix(0.9, 0.6, aNear);
           #include <fog_vertex>
         }`,
       fragmentShader: /* glsl */`
-        uniform vec3 uCol; varying float vA;
+        uniform vec3 uCol; varying float vA; varying float vSoft;
         #include <fog_pars_fragment>
         void main(){
           vec2 c = gl_PointCoord - 0.5; float d = length(c);
-          float a = smoothstep(0.5, 0.15, d) * vA * 0.9;
+          // close flakes are out of focus: soft discs; far ones crisp
+          float a = smoothstep(0.5, mix(0.15, 0.0, vSoft), d) * vA * 0.95;
           gl_FragColor = vec4(uCol, a);
           #include <fog_fragment>
         }`,
@@ -299,7 +307,9 @@ const Sky = {
     this.hemi.intensity = lerp(a.hi, b.hi, t) * (1 + ov * 0.25);
     this.exposure = lerp(a.exp, b.exp, t) * (1 + ov * 0.12);
     this.fogColor.copy(fog);
-    const fogD = mode === 'map' ? 0.00008 + this.weather.snow * 0.00012 : 0.00011 + this.weather.snow * 0.0042 + ov * 0.00035;
+    const sn = this.weather.snow;
+    // falling snow closes the view in fast: a storm is a real whiteout
+    const fogD = mode === 'map' ? 0.00008 + sn * 0.00012 : 0.00011 + sn * 0.0016 + sn * sn * 0.0105 + ov * 0.00035;
     Sky.scene.fog.color.copy(fog);
     Sky.scene.fog.density = fogD;
     U.uSunDir.value.copy(ldir); U.uSunColor.value.copy(this.sun.color).multiplyScalar(this.sun.intensity * 0.4);
@@ -309,8 +319,9 @@ const Sky = {
     // snowfall around the camera
     this.snowU.uCam.value.copy(cam.position);
     this.snowU.uAmt.value = this.weather.snow * (mode === 'map' ? 0.0 : 1);
-    this.snowU.uWind.value.set(this.weather.wind * 1.0, this.weather.wind * 0.35);
-    this.snowU.uCol.value.copy(this.hemi.color).multiplyScalar(this.hemi.intensity).add(new THREE.Color(this.sun.color).multiplyScalar(this.sun.intensity * 0.15));
+    this.snowU.uWind.value.set(this.weather.wind * (1.0 + this.weather.wind * 1.5), this.weather.wind * 0.35);
+    // flakes are a touch darker than lit snow, so they read against white sky and slopes
+    this.snowU.uCol.value.copy(this.hemi.color).multiplyScalar(this.hemi.intensity * 0.72).add(new THREE.Color(this.sun.color).multiplyScalar(this.sun.intensity * 0.08));
   },
   label() {
     const h = Math.floor(this.time), m = Math.floor((this.time - h) * 60);
