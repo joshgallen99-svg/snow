@@ -1,103 +1,289 @@
 // ============================================================================
-//  fx — particles (spray, powder, smoke, mist, sparkle), the compacted snow
-//  trail, hovering snowflake tokens, lamp glows
+//  fx — particles (edge spray, powder plumes, skid fans, landing puffs, smoke,
+//  mist), the compacted snow trail, hovering snowflake tokens, lamp glows
 // ============================================================================
+// Particles are lit puffs: each one is a point sprite with a fake sphere normal,
+// eroded by a tiling noise texture so no two look alike. "Hard" particles are
+// crisp chunks of snow that catch the sun; soft ones are drifting powder.
 const FX = {
-  N: 7000, cursor: 0, alive: 0,
+  N: 12000, cursor: 0, _lc: new THREE.Color(),
   init(scene) {
     const N = this.N;
     this.p = new Float32Array(N * 3); this.v = new Float32Array(N * 3);
     this.life = new Float32Array(N); this.max = new Float32Array(N); this.size0 = new Float32Array(N); this.size1 = new Float32Array(N);
     this.drag = new Float32Array(N); this.grav = new Float32Array(N); this.alpha0 = new Float32Array(N);
-    this.col = new Float32Array(N * 3);
+    this.flags = new Uint8Array(N); this.floor = new Float32Array(N);
     const g = new THREE.BufferGeometry();
-    this.aPos = new THREE.BufferAttribute(new Float32Array(N * 3), 3).setUsage(THREE.DynamicDrawUsage);
-    this.aSize = new THREE.BufferAttribute(new Float32Array(N), 1).setUsage(THREE.DynamicDrawUsage);
-    this.aAlpha = new THREE.BufferAttribute(new Float32Array(N), 1).setUsage(THREE.DynamicDrawUsage);
-    this.aCol = new THREE.BufferAttribute(new Float32Array(N * 3), 3).setUsage(THREE.DynamicDrawUsage);
-    g.setAttribute('position', this.aPos); g.setAttribute('aSize', this.aSize); g.setAttribute('aAlpha', this.aAlpha); g.setAttribute('aCol', this.aCol);
+    const dyn = (n, k) => new THREE.BufferAttribute(new Float32Array(n * k), k).setUsage(THREE.DynamicDrawUsage);
+    this.aPos = dyn(N, 3); this.aSize = dyn(N, 1); this.aAlpha = dyn(N, 1); this.aCol = dyn(N, 3); this.aMisc = dyn(N, 3);
+    g.setAttribute('position', this.aPos); g.setAttribute('aSize', this.aSize); g.setAttribute('aAlpha', this.aAlpha);
+    g.setAttribute('aCol', this.aCol); g.setAttribute('aMisc', this.aMisc);
+    g.setDrawRange(0, 0);
     this.light = { value: new THREE.Color(1, 1, 1) };
+    this.uni = {
+      uLight: this.light, uPx: { value: 1 }, uNoise: { value: this.makeNoise() },
+      uSunV: { value: new V3(0, 1, 0) }, uSunC: { value: new THREE.Color(1, 1, 1) }, uAmb: { value: new THREE.Color(0.6, 0.65, 0.75) },
+    };
     const m = new THREE.ShaderMaterial({
-      uniforms: Object.assign({ uLight: this.light, uPx: { value: 1 } }, THREE.UniformsUtils.clone(THREE.UniformsLib.fog)), transparent: true, depthWrite: false, fog: true,
+      uniforms: Object.assign(this.uni, THREE.UniformsUtils.clone(THREE.UniformsLib.fog)), transparent: true, depthWrite: false, fog: true,
       vertexShader: /* glsl */`
-        attribute float aSize; attribute float aAlpha; attribute vec3 aCol; uniform float uPx;
-        varying float vA; varying vec3 vC;
+        attribute float aSize; attribute float aAlpha; attribute vec3 aCol; attribute vec3 aMisc; uniform float uPx;
+        varying float vA; varying vec3 vC; varying vec3 vM;
         #include <fog_pars_vertex>
         void main(){ vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mvPosition;
-          gl_PointSize = aSize * uPx * 420.0 / max(0.5, -mvPosition.z); vA = aAlpha; vC = aCol;
+          float px = aSize * uPx * 420.0 / max(0.3, -mvPosition.z);
+          // sub-pixel specks fade out instead of flickering
+          vA = aAlpha * clamp(px / 2.0, 0.0, 1.0); gl_PointSize = max(px, 1.5);
+          if (aAlpha <= 0.0) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+          vC = aCol; vM = aMisc;
           #include <fog_vertex>
         }`,
       fragmentShader: /* glsl */`
-        uniform vec3 uLight; varying float vA; varying vec3 vC;
+        uniform sampler2D uNoise; uniform vec3 uSunV, uSunC, uAmb;
+        varying float vA; varying vec3 vC; varying vec3 vM;
         #include <fog_pars_fragment>
-        void main(){ vec2 c = gl_PointCoord - 0.5; float d = length(c); if (d > 0.5) discard;
-          float a = smoothstep(0.5, 0.0, d) * vA;
-          gl_FragColor = vec4(vC * uLight, a);
+        void main(){
+          vec2 c = gl_PointCoord * 2.0 - 1.0; c.y = -c.y;
+          float r2 = dot(c, c); if (r2 > 1.0) discard;
+          float seed = vM.x, hard = vM.y, lit = vM.z;
+          float a = seed * 6.2832; vec2 rc = mat2(cos(a), -sin(a), sin(a), cos(a)) * c;
+          vec4 nz = texture2D(uNoise, rc * 0.32 + vec2(seed * 7.13, seed * 3.71));
+          float n = nz.r * 0.6 + nz.g * 0.4;
+          // soft: a cauliflower puff eroded by noise; hard: a chunk with a ragged edge
+          float soft = clamp((1.0 - r2) * 1.5 - (1.0 - n) * 0.95, 0.0, 1.0); soft = soft * soft * (3.0 - 2.0 * soft);
+          float chunk = smoothstep(0.0, 0.22, 1.0 - sqrt(r2) - (nz.b - 0.5) * 0.55);
+          float alpha = mix(soft, chunk, hard) * vA;
+          if (alpha < 0.004) discard;
+          // fake sphere normal, bumped by the noise so puffs read as lumpy
+          vec3 N = normalize(vec3(c + (nz.rg - 0.5) * (0.9 - hard * 0.6), sqrt(max(0.0, 1.0 - r2)) + 0.25));
+          float ndl = dot(N, uSunV);
+          float wrap = clamp(ndl * 0.55 + 0.45, 0.0, 1.0);
+          float diff = mix(wrap * wrap, max(ndl, 0.0), hard);
+          // looking toward the sun, thin powder glows at its edges
+          float scatter = pow(max(0.0, -uSunV.z), 3.0) * (1.0 - soft * 0.6) * (1.0 - hard) * 1.4;
+          float spark = pow(max(0.0, dot(reflect(-uSunV, N), vec3(0.0, 0.0, 1.0))), 60.0) * hard * step(0.55, nz.a) * 3.0;
+          vec3 shade = uAmb * (0.72 + 0.28 * N.y) + uSunC * (diff + scatter + spark);
+          vec3 col = mix(vC, vC * shade, lit);
+          gl_FragColor = vec4(col, alpha);
           #include <fog_fragment>
         }`,
     });
     this.points = new THREE.Points(g, m);
     this.points.frustumCulled = false;
+    this.points.renderOrder = 2;
     scene.add(this.points);
     this.mat = m;
+    this.hi = 0; // highest slot ever used, so the draw range stays tight
+    this.em = { dist: 0, last: null, plume: 0, mist: 0, butter: 0 };
     this.initTrail(scene);
     this.initTokens(scene);
     this.initGlows(scene);
   },
-  spawn(x, y, z, vx, vy, vz, life, s0, s1, a0, r = 1, g = 1, b = 1, grav = 1, drag = 1.5) {
+  // tiling fbm noise, four decorrelated channels
+  makeNoise() {
+    const S = 64, data = new Uint8Array(S * S * 4), rnd = mulberry32(91);
+    for (let ch = 0; ch < 4; ch++) {
+      const oct = [];
+      for (let o = 0, c = 4; o < 4; o++, c *= 2) { const g = new Float32Array(c * c); for (let i = 0; i < g.length; i++) g[i] = rnd(); oct.push({ c, g }); }
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+        let v = 0, amp = 0.5, tot = 0;
+        for (const { c, g } of oct) {
+          const fx = (x / S) * c, fy = (y / S) * c, ix = Math.floor(fx), iy = Math.floor(fy);
+          let u = fx - ix, w = fy - iy; u = u * u * (3 - 2 * u); w = w * w * (3 - 2 * w);
+          const at = (a, b) => g[((b + c) % c) * c + ((a + c) % c)];
+          v += amp * lerp(lerp(at(ix, iy), at(ix + 1, iy), u), lerp(at(ix, iy + 1), at(ix + 1, iy + 1), u), w);
+          tot += amp; amp *= 0.55;
+        }
+        data[(y * S + x) * 4 + ch] = Math.round(clamp((v / tot - 0.5) * 1.6 + 0.5, 0, 1) * 255);
+      }
+    }
+    const t = new THREE.DataTexture(data, S, S, THREE.RGBAFormat);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true;
+    t.needsUpdate = true;
+    return t;
+  },
+  // flags: 1 = settles on the snow instead of falling through it
+  spawn(x, y, z, vx, vy, vz, life, s0, s1, a0, r = 1, g = 1, b = 1, grav = 1, drag = 1.5, hard = 0, lit = 1, flags = 0) {
     const i = this.cursor; this.cursor = (this.cursor + 1) % this.N;
+    if (i >= this.hi) { this.hi = i + 1; this.points.geometry.setDrawRange(0, this.hi); }
     this.p[i * 3] = x; this.p[i * 3 + 1] = y; this.p[i * 3 + 2] = z;
     this.v[i * 3] = vx; this.v[i * 3 + 1] = vy; this.v[i * 3 + 2] = vz;
     this.life[i] = life; this.max[i] = life; this.size0[i] = s0; this.size1[i] = s1; this.alpha0[i] = a0;
-    this.col[i * 3] = r; this.col[i * 3 + 1] = g; this.col[i * 3 + 2] = b;
-    this.grav[i] = grav; this.drag[i] = drag;
+    const C = this.aCol.array, M = this.aMisc.array;
+    C[i * 3] = r; C[i * 3 + 1] = g; C[i * 3 + 2] = b;
+    M[i * 3] = Math.random(); M[i * 3 + 1] = hard; M[i * 3 + 2] = lit;
+    this.grav[i] = grav; this.drag[i] = drag; this.flags[i] = flags;
+    if (flags & 1) this.floor[i] = this.snowTop(x, z);
+    return i;
+  },
+  // the fresh snow surface (the layer sits on the ground)
+  snowTop(x, z) {
+    const gr = World.attr(World.groom, x, z) / 255, pw = World.attr(World.powder, x, z) / 255;
+    return World.height(x, z) + lerp(0.3, 0.13, gr) + pw * (1 - gr) * 0.3;
   },
   burst(x, y, z, n, speed, opts = {}) {
     for (let k = 0; k < n; k++) {
       const a = Math.random() * TAU, u = Math.random();
       this.spawn(x, y + 0.1, z, Math.cos(a) * speed * u + (opts.vx || 0), (0.4 + Math.random()) * speed * (opts.up ?? 0.7) + (opts.vy || 0), Math.sin(a) * speed * u + (opts.vz || 0),
-        (opts.life || 1.2) * (0.6 + Math.random() * 0.6), opts.s0 || 0.25, opts.s1 || 0.9, opts.a || 0.85, opts.r ?? 1, opts.g ?? 1, opts.b ?? 1, opts.grav ?? 0.6, opts.drag ?? 2.2);
+        (opts.life || 1.2) * (0.6 + Math.random() * 0.6), opts.s0 || 0.25, opts.s1 || 0.9, opts.a || 0.85, opts.r ?? 1, opts.g ?? 1, opts.b ?? 1, opts.grav ?? 0.6, opts.drag ?? 2.2,
+        opts.hard ?? 0, opts.lit ?? 1, opts.flags ?? 0);
+    }
+  },
+  // a snow impact: a ring of heavy chunks thrown out low, and a cloud that rolls outward and hangs
+  impact(x, y, z, vx, vz, power, powder) {
+    const nC = Math.round(8 + power * 26), nP = Math.round(6 + power * (14 + powder * 30));
+    for (let k = 0; k < nC; k++) {
+      const a = Math.random() * TAU, s = (1.5 + Math.random() * 3.5) * (0.6 + power);
+      this.spawn(x + Math.cos(a) * 0.3, y + 0.1, z + Math.sin(a) * 0.3, vx * 0.45 + Math.cos(a) * s, 1.5 + Math.random() * 3 * (0.5 + power), vz * 0.45 + Math.sin(a) * s,
+        0.7 + Math.random() * 0.7, 0.05 + Math.random() * 0.07, 0.04, 1, 1, 1, 1, 1, 1.4, 0.9, 1, 1);
+    }
+    for (let k = 0; k < nP; k++) {
+      const a = Math.random() * TAU, s = (0.8 + Math.random() * 2.2) * (0.5 + power);
+      this.spawn(x + Math.cos(a) * 0.5, y + 0.15 + Math.random() * 0.3, z + Math.sin(a) * 0.5, vx * 0.3 + Math.cos(a) * s, 0.4 + Math.random() * (1 + powder * 2), vz * 0.3 + Math.sin(a) * s,
+        1.2 + Math.random() * (1 + powder * 1.4), 0.35 + powder * 0.2, 1.4 + power * 1.2 + powder * 1.6, 0.42 + powder * 0.2, 1, 1, 1, 0.04, 1.6, 0, 1, 0);
     }
   },
   update(dt) {
-    const N = this.N, p = this.p, v = this.v, P = this.aPos.array, S = this.aSize.array, A = this.aAlpha.array, C = this.aCol.array;
-    for (let i = 0; i < N; i++) {
+    const H = this.hi, p = this.p, v = this.v, P = this.aPos.array, S = this.aSize.array, A = this.aAlpha.array;
+    for (let i = 0; i < H; i++) {
       if (this.life[i] <= 0) { if (A[i] !== 0) A[i] = 0; continue; }
       this.life[i] -= dt;
+      if (this.life[i] <= 0) { A[i] = 0; continue; }
       const t = 1 - this.life[i] / this.max[i];
-      const dr = Math.exp(-this.drag[i] * dt);
-      v[i * 3] *= dr; v[i * 3 + 2] *= dr; v[i * 3 + 1] = v[i * 3 + 1] * dr - 9.81 * this.grav[i] * dt;
-      p[i * 3] += v[i * 3] * dt; p[i * 3 + 1] += v[i * 3 + 1] * dt; p[i * 3 + 2] += v[i * 3 + 2] * dt;
-      P[i * 3] = p[i * 3]; P[i * 3 + 1] = p[i * 3 + 1]; P[i * 3 + 2] = p[i * 3 + 2];
-      S[i] = lerp(this.size0[i], this.size1[i], Math.sqrt(t));
-      A[i] = this.alpha0[i] * (1 - t) * (1 - t) * Math.min(1, t * 12 + 0.2);
-      C[i * 3] = this.col[i * 3]; C[i * 3 + 1] = this.col[i * 3 + 1]; C[i * 3 + 2] = this.col[i * 3 + 2];
+      const dr = Math.exp(-this.drag[i] * dt), i3 = i * 3;
+      v[i3] *= dr; v[i3 + 2] *= dr; v[i3 + 1] = v[i3 + 1] * dr - 9.81 * this.grav[i] * dt;
+      p[i3] += v[i3] * dt; p[i3 + 1] += v[i3 + 1] * dt; p[i3 + 2] += v[i3 + 2] * dt;
+      if (this.flags[i] & 1 && p[i3 + 1] < this.floor[i] && v[i3 + 1] < 0) {
+        // landed: slide to a stop on the surface and melt into it
+        p[i3 + 1] = this.floor[i]; v[i3 + 1] = 0; v[i3] *= 0.35; v[i3 + 2] *= 0.35;
+        if (this.life[i] > 0.35) { this.life[i] = 0.35; this.max[i] = 0.35 / Math.max(0.05, 1 - t); }
+        this.floor[i] = this.snowTop(p[i3], p[i3 + 2]);
+      }
+      P[i3] = p[i3]; P[i3 + 1] = p[i3 + 1]; P[i3 + 2] = p[i3 + 2];
+      S[i] = lerp(this.size0[i], this.size1[i], 1 - (1 - t) * (1 - t));
+      A[i] = this.alpha0[i] * Math.min(1, t * 14 + 0.15) * (1 - t * t);
     }
-    this.aPos.needsUpdate = true; this.aSize.needsUpdate = true; this.aAlpha.needsUpdate = true; this.aCol.needsUpdate = true;
+    this.aPos.needsUpdate = true; this.aSize.needsUpdate = true; this.aAlpha.needsUpdate = true; this.aCol.needsUpdate = true; this.aMisc.needsUpdate = true;
+  },
+  // light the particles like the rest of the scene
+  updateLight(cam) {
+    const u = this.uni, s = Sky.sun;
+    u.uSunV.value.copy(U.uSunDir.value).transformDirection(cam.matrixWorldInverse);
+    u.uSunC.value.copy(s.color).multiplyScalar(s.intensity * 0.55);
+    u.uAmb.value.copy(Sky.hemi.color).multiplyScalar(Sky.hemi.intensity * 0.95);
+    // lamps light the snow you throw up at night
+    const lamp = U.uLampOn ? U.uLampOn.value : 0;
+    if (lamp > 0) u.uAmb.value.add(this._lc.setRGB(0.32, 0.24, 0.14).multiplyScalar(lamp));
   },
 
-  // ---- board spray from the edge ------------------------------------------------
+  // ---- board snow: distance-based, so the amount of snow thrown doesn't depend on frame rate ----
+  // Emitters walk the path the board took this frame and drop particles every few centimetres,
+  // interpolating position so fast riding leaves a continuous sheet rather than clumps.
   boardSpray(dt, pl) {
-    if (!pl.ground || pl.crashed || pl.grind) return;
-    const sp = pl.speed;
-    if (sp < 2) return;
-    const S = pl.surf;
+    const E = this.em;
+    const on = pl.ground && !pl.crashed && !pl.grind;
+    if (!on || pl.speed < 1.2) { E.last = null; return; }
+    const p = pl.pos;
+    if (!E.last) { E.last = p.clone(); return; }
+    const step = E.last.distanceTo(p);
+    if (step > 6) { E.last.copy(p); return; }
+    const sp = pl.speed, S = pl.surf;
+    const powder = S.powder * (1 - S.groom) * (1 - S.road);
+    const fresh = (1 - S.groom * 0.75) * (1 - S.road);
     const carve = Math.abs(pl.edge) * sstep(4, 14, sp);
-    const skid = pl.skid + pl.brake * 0.8;
-    const powder = S.powder * (1 - S.groom);
-    const rate = (carve * 90 + skid * 260 + powder * sp * 6) * dt;
-    const n = Math.floor(rate) + (Math.random() < rate % 1 ? 1 : 0);
-    if (!n) return;
-    const f = new V3(Math.sin(pl.yaw), 0, Math.cos(pl.yaw));
-    const left = new V3().crossVectors(pl.n, pl.vel).normalize();
-    const outward = left.clone().multiplyScalar(pl.edge > 0 ? -1 : 1); // spray leaves the outside of the turn
+    const skid = clamp(pl.skid * 1.4 + pl.brake * 0.6, 0, 1.2);
+    const press = Math.abs(pl.press || 0);
+    // board frame
+    const f = _v.set(Math.sin(pl.yaw), 0, Math.cos(pl.yaw));
+    const vh = Math.hypot(pl.vel.x, pl.vel.z) || 1, dx = pl.vel.x / vh, dz = pl.vel.z / vh;
+    const lx = -dz, lz = dx; // left of travel
+    const turnSide = pl.edge > 0 ? -1 : 1; // spray leaves the outside of the turn
+    const ox = lx * turnSide, oz = lz * turnSide;
+    const tail = -pl.ride; // the tail is behind along the board
+    const fx = f.x, fz = f.z;
+    // per-metre rates
+    const rEdge = carve * (6 + sp * 0.9) * (0.5 + fresh);
+    const rSkid = skid * (10 + sp * 1.6) * (0.6 + fresh * 0.8);
+    const rPlume = powder * (3 + sp * 0.55);
+    const rMist = sstep(9, 24, sp) * (0.6 + fresh) * 1.4;
+    const rButter = press * (pl.butterSpin ? 14 : 4);
+    const emit = (rate, fn, key) => {
+      E[key] = (E[key] || 0) + rate * step;
+      let n = Math.floor(E[key]); E[key] -= n;
+      while (n-- > 0) { const k = Math.random(); fn(E.last.x + (p.x - E.last.x) * k, E.last.y + (p.y - E.last.y) * k, E.last.z + (p.z - E.last.z) * k); }
+    };
+    // carve: a sheet off the tail half of the edge, thrown outward and up
+    emit(rEdge, (x, y, z) => {
+      const along = tail * (0.1 + Math.random() * 0.75);
+      const ex = x + fx * along + ox * 0.14, ez = z + fz * along + oz * 0.14;
+      const out = (1.5 + Math.random() * 2.5) * (0.6 + carve) + sp * 0.12;
+      const up = 1.0 + Math.random() * (1.4 + powder * 2.5) + sp * 0.05;
+      const hard = Math.random() < 0.55 ? 1 : 0;
+      this.spawn(ex, y + 0.05, ez, pl.vel.x * 0.55 + ox * out, up, pl.vel.z * 0.55 + oz * out,
+        hard ? 0.35 + Math.random() * 0.35 : 0.5 + Math.random() * 0.6, hard ? 0.035 + Math.random() * 0.05 : 0.14, hard ? 0.03 : 0.5 + powder * 0.7 + Math.random() * 0.3,
+        hard ? 0.95 : 0.4, 1, 1, 1, hard ? 1 : 0.3, hard ? 1.2 : 2.6, hard, 1, hard);
+    }, 'edgeA');
+    // skid: the whole downhill edge scrapes a wide fan of snow ahead of the board
+    emit(rSkid, (x, y, z) => {
+      const along = (Math.random() - 0.5) * 1.4;
+      const ex = x + fx * along, ez = z + fz * along;
+      const fan = (Math.random() - 0.5) * 1.2;
+      const fwd = sp * (0.55 + Math.random() * 0.3);
+      const vx = dx * fwd + (lx * fan + ox * 0.6) * (1.5 + sp * 0.1), vz = dz * fwd + (lz * fan + oz * 0.6) * (1.5 + sp * 0.1);
+      const hard = Math.random() < 0.6 ? 1 : 0;
+      this.spawn(ex, y + 0.06, ez, vx, 0.8 + Math.random() * (1.6 + powder * 2), vz,
+        hard ? 0.35 + Math.random() * 0.4 : 0.6 + Math.random() * 0.7, hard ? 0.04 + Math.random() * 0.05 : 0.2, hard ? 0.03 : 0.7 + powder + Math.random() * 0.4,
+        hard ? 0.95 : 0.38, 1, 1, 1, hard ? 1 : 0.25, hard ? 1.5 : 2.8, hard, 1, hard);
+    }, 'skidA');
+    // powder: a rooster tail behind the board that hangs in the air and drifts with the wind
+    const wind = Sky.weather ? Sky.weather.wind : 0;
+    emit(rPlume, (x, y, z) => {
+      const along = tail * (0.4 + Math.random() * 0.5);
+      const side = (Math.random() - 0.5) * 0.6;
+      const ex = x + fx * along + lx * side, ez = z + fz * along + lz * side;
+      const big = Math.random() < 0.6;
+      if (big) {
+        this.spawn(ex, y + 0.15, ez, pl.vel.x * 0.18 + lx * side * 2 + wind * 0.8, 1.6 + Math.random() * 2.2 + sp * 0.07, pl.vel.z * 0.18 + lz * side * 2,
+          1.6 + Math.random() * 1.6, 0.4, 1.8 + Math.random() * 1.6 + sp * 0.04, 0.34, 1, 1, 1, 0.05, 1.3, 0, 1, 0);
+      } else {
+        // clumps thrown higher that fall back out of the cloud
+        this.spawn(ex, y + 0.12, ez, pl.vel.x * 0.35 + lx * side * 3, 2.5 + Math.random() * 3.5 + sp * 0.08, pl.vel.z * 0.35 + lz * side * 3,
+          0.8 + Math.random() * 0.6, 0.05 + Math.random() * 0.06, 0.04, 0.95, 1, 1, 1, 0.9, 1.0, 1, 1, 1);
+      }
+    }, 'plumeA');
+    // bow wave: deep snow piles up and splits around the nose
+    if (powder > 0.3 && sp > 5) emit(powder * 2.5, (x, y, z) => {
+      const nose = pl.ride * 0.75, s = Math.random() < 0.5 ? -1 : 1;
+      this.spawn(x + fx * nose, y + 0.2, z + fz * nose, pl.vel.x * 0.75 + lx * s * (1 + Math.random() * 1.5), 0.6 + Math.random(), pl.vel.z * 0.75 + lz * s * (1 + Math.random() * 1.5),
+        0.5 + Math.random() * 0.4, 0.25, 0.8, 0.35, 1, 1, 1, 0.2, 2.5, 0, 1, 0);
+    }, 'bowA');
+    // fine mist kicked up at speed, even on hardpack
+    emit(rMist, (x, y, z) => {
+      const along = tail * (0.3 + Math.random() * 0.6);
+      this.spawn(x + fx * along, y + 0.08, z + fz * along, pl.vel.x * 0.35 + (Math.random() - 0.5), 0.3 + Math.random() * 0.6, pl.vel.z * 0.35 + (Math.random() - 0.5),
+        0.7 + Math.random() * 0.5, 0.15, 0.7 + Math.random() * 0.5, 0.16 + powder * 0.1, 1, 1, 1, 0.02, 2.2, 0, 1, 0);
+    }, 'mistA');
+    // butters: the free end of the board sweeps a smear of snow around the pivot
+    if (rButter > 0) emit(rButter, (x, y, z) => {
+      const end = -pl.press * pl.ride * 0.75;
+      const ex = x + fx * end, ez = z + fz * end;
+      const sw = pl.butterSpin || 0;
+      const vx = -fz * sw * 2.5 * Math.sign(end) + pl.vel.x * 0.4, vz = fx * sw * 2.5 * Math.sign(end) + pl.vel.z * 0.4;
+      const hard = Math.random() < 0.5 ? 1 : 0;
+      this.spawn(ex, y + 0.06, ez, vx + (Math.random() - 0.5), 0.7 + Math.random() * 1.2, vz + (Math.random() - 0.5),
+        0.4 + Math.random() * 0.4, hard ? 0.04 : 0.15, hard ? 0.03 : 0.6, hard ? 0.9 : 0.35, 1, 1, 1, hard ? 1 : 0.3, 2, hard, 1, hard);
+    }, 'butterA');
+    E.last.copy(p);
+  },
+  // rails: flecks of snow scraped off the top of the rail
+  railSpray(dt, pl) {
+    const G2 = pl.grind;
+    if (!G2) return;
+    const rate = (8 + G2.v * 3) * dt, n = Math.floor(rate) + (Math.random() < rate % 1 ? 1 : 0);
     for (let k = 0; k < n; k++) {
-      const along = (Math.random() - 0.5) * 1.3;
-      const x = pl.pos.x + f.x * along, z = pl.pos.z + f.z * along;
-      const out = 2 + sp * 0.18 * (skid + carve) + Math.random() * 2;
-      this.spawn(x, pl.pos.y + 0.08, z,
-        pl.vel.x * 0.35 + outward.x * out + (Math.random() - 0.5) * 1.5, 1.2 + Math.random() * (2 + powder * 3), pl.vel.z * 0.35 + outward.z * out + (Math.random() - 0.5) * 1.5,
-        0.5 + Math.random() * 0.6 + powder * 0.6, 0.08 + powder * 0.1, 0.35 + powder * 0.9, 0.9, 1, 1, 1, 0.55, 2.4);
+      const s = Math.random() < 0.5 ? -1 : 1;
+      this.spawn(pl.pos.x, pl.pos.y + 0.05, pl.pos.z, pl.vel.x * 0.6 - G2.g.dz * s * (0.6 + Math.random()), 0.6 + Math.random() * 1.2, pl.vel.z * 0.6 + G2.g.dx * s * (0.6 + Math.random()),
+        0.35 + Math.random() * 0.3, 0.035, 0.03, 0.9, 1, 1, 1, 1, 1, 1, 1, 0);
     }
   },
 
@@ -226,7 +412,7 @@ const FX = {
         const dx = pl.pos.x - tk.x, dy = pl.pos.y + 0.8 - tk.y - bob, dz = pl.pos.z - tk.z;
         if (dx * dx + dy * dy + dz * dz < 2.4 * 2.4) {
           this.collected.add(tk.id);
-          this.burst(tk.x, tk.y, tk.z, 26, 3, { r: 0.75, g: 0.9, b: 1.4, s0: 0.12, s1: 0.04, life: 0.9, grav: 0.1, up: 0.4 });
+          this.burst(tk.x, tk.y, tk.z, 30, 3, { r: 0.75, g: 0.9, b: 1.4, s0: 0.1, s1: 0.04, life: 0.9, grav: 0.1, up: 0.4, hard: 1, lit: 0 });
           onPick(tk);
         }
       }

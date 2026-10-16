@@ -5,6 +5,12 @@
 //  rebuilt when the gear changes.
 // ============================================================================
 const J = { head: 0, neck: 1, pelvis: 2, lHand: 3, rHand: 4, lElbow: 5, rElbow: 6, lKnee: 7, rKnee: 8, lFoot: 9, rFoot: 10 };
+// where each hand goes for each grab, in board space before mirroring for stance (L = front hand for regular)
+const RIDER_GRABS = {
+  indy: { R: [-0.05, 0.15, 0.15] }, melon: { L: [0.05, 0.15, -0.15] }, tail: { R: [-0.66, 0.14, 0.02] }, nose: { L: [0.66, 0.14, 0.02] },
+  truck: { L: [0.08, 0.15, -0.15], R: [-0.08, 0.15, 0.15] }, method: { L: [-0.02, 0.15, -0.16] }, japan: { L: [0.0, 0.15, 0.16] },
+  stalefish: { R: [-0.12, 0.15, -0.16] }, mute: { L: [0.12, 0.15, 0.16] }, crail: { R: [0.55, 0.15, 0.13] },
+};
 const NJ = 11;
 let ENV_MAP = null; // set by the game once the sky has been captured
 
@@ -249,7 +255,7 @@ class RiderModel {
     // pelvis: low when crouched, shifts over the toe or heel edge with lean
     const ph = 0.93 - c * 0.3 - tuckUp - P.tuck * 0.08;
     const pz = lean * 0.2 - P.brake * 0.12 - c * 0.04;
-    this.local(Jt[J.pelvis], P.twist * 0.02 + P.turn * 0.03 * s, ph, pz);
+    this.local(Jt[J.pelvis], P.twist * 0.02 + P.turn * 0.03 * s + (P.press || 0) * 0.2, ph + Math.abs(P.press || 0) * 0.04, pz);
     // torso tilts forward with crouch and tuck, and twists toward the turn
     const tilt = 0.18 + c * 0.42 + P.tuck * 0.35 + lean * 0.25 - P.brake * 0.25;
     const tx = Math.sin(P.twist) * 0.25 + P.turn * 0.12;
@@ -272,13 +278,10 @@ class RiderModel {
     handR.copy(shR).addScaledVector(this.bx, -(0.25 + arms * 0.2) * s).addScaledVector(this.by, -0.42 + arms * 0.3 - sw).addScaledVector(this.bz, 0.08 + P.tuck * 0.25 - lead);
     if (P.grab && P.grabAmt > 0.01) {
       const t = new V3(), g = P.grab;
-      // grab targets on the board edges (board space), rear hand = right hand for regular
-      if (g === 'indy') this.local(t, -0.05 * s, 0.15, 0.15);
-      else if (g === 'melon') this.local(t, 0.05 * s, 0.15, -0.15);
-      else if (g === 'tail') this.local(t, -0.66 * s, 0.14, 0.02);
-      else this.local(t, 0.66 * s, 0.14, 0.02);
-      const useLeft = g === 'melon' || g === 'nose';
-      (useLeft ? handL : handR).lerp(t, P.grabAmt);
+      // grab targets on the board edges (board space: x along the board, z toward the toe edge)
+      const G = RIDER_GRABS[g] || RIDER_GRABS.indy;
+      if (G.L) { this.local(t, G.L[0] * s, G.L[1], G.L[2]); handL.lerp(t, P.grabAmt); }
+      if (G.R) { this.local(t, G.R[0] * s, G.R[1], G.R[2]); handR.lerp(t, P.grabAmt); }
     }
     Jt[J.lHand].copy(handL); Jt[J.rHand].copy(handR);
     this.ik(Jt[J.lElbow], shL, handL, 0.3, 0.3, new V3().copy(this.by).multiplyScalar(-0.5).addScaledVector(this.bz, -0.6).addScaledVector(this.bx, 0.3 * s));

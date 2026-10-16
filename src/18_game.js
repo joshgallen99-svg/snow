@@ -386,7 +386,7 @@ const Game = {
     for (const e of Player.events) {
       if (e.type === 'trick') { UI.trick(e); Sound.trick(e.mult); if (s) s.score += e.pts; }
       else if (e.type === 'land') {
-        if (e.air > 0.15) { Sound.land(e.impact); Cam.kick(clamp(e.impact / 14, 0, 0.8)); FX.burst(Player.pos.x, Player.pos.y, Player.pos.z, Math.round(10 + e.impact * 3), 2 + e.impact * 0.25, { vx: Player.vel.x * 0.3, vz: Player.vel.z * 0.3, s0: 0.3, s1: 1.4, life: 1.1 }); }
+        if (e.air > 0.15) { Sound.land(e.impact); Cam.kick(clamp(e.impact / 14, 0, 0.8)); const S = Player.surf; FX.impact(Player.pos.x, Player.pos.y, Player.pos.z, Player.vel.x, Player.vel.z, clamp(e.impact / 12, 0.1, 1.2), S.powder * (1 - S.groom)); }
         if (Cam.mode === 'cine') Cam.setMode('chase', 0.7);
       } else if (e.type === 'takeoff') { if (e.ollie) Sound.pop(); Cam.startCine(Player); FX.breakTrail(); }
       else if (e.type === 'crash') {
@@ -396,7 +396,7 @@ const Game = {
         const spin = new V3().crossVectors(UP, Player.vel).normalize().multiplyScalar(2 + Player.vel.length() * 0.35);
         spin.x += (Math.random() - 0.5) * 3; spin.z += (Math.random() - 0.5) * 3;
         this.rider.startRagdoll(Player.vel.clone().multiplyScalar(0.8), spin);
-        FX.burst(Player.pos.x, Player.pos.y, Player.pos.z, 50, 4, { s0: 0.4, s1: 1.8, life: 1.4, vx: Player.vel.x * 0.4, vz: Player.vel.z * 0.4 });
+        FX.impact(Player.pos.x, Player.pos.y, Player.pos.z, Player.vel.x, Player.vel.z, 1.2, Player.surf.powder * (1 - Player.surf.groom) + 0.3);
         if (Cam.mode === 'cine') Cam.setMode('chase', 0.5);
       } else if (e.type === 'bump') { if (e.into > 2) Sound.bump(); }
       else if (e.type === 'brush') {
@@ -404,7 +404,9 @@ const Game = {
         const t = e.tree, n = t.type ? 14 : 34;
         for (let k = 0; k < n; k++) {
           const a = Math.random() * TAU, r = Math.random() * (t.type ? 1.2 : 2.2) * t.s, h = t.y + (1.5 + Math.random() * 6) * t.s;
-          FX.spawn(t.x + Math.cos(a) * r, h, t.z + Math.sin(a) * r, Player.vel.x * 0.1, -0.5 - Math.random(), Player.vel.z * 0.1, 1.6 + Math.random(), 0.25, 1.3, 0.8, 1, 1, 1, 0.7, 1.4);
+          const clump = Math.random() < 0.45;
+          if (clump) FX.spawn(t.x + Math.cos(a) * r, h, t.z + Math.sin(a) * r, Player.vel.x * 0.1, -0.5 - Math.random(), Player.vel.z * 0.1, 2.5, 0.09 + Math.random() * 0.08, 0.07, 1, 1, 1, 1, 1, 0.4, 1, 1, 1);
+          else FX.spawn(t.x + Math.cos(a) * r, h, t.z + Math.sin(a) * r, Player.vel.x * 0.1, -0.5 - Math.random(), Player.vel.z * 0.1, 1.6 + Math.random(), 0.25, 1.5, 0.5, 1, 1, 1, 0.5, 1.4);
         }
         Sound.brush();
       }
@@ -606,6 +608,8 @@ const Game = {
     const bx = new V3(), by = new V3();
     pl.boardFrame(bx, by);
     const pos = pl.pos.clone();
+    // on a press the board rests on one end, so its middle lifts off the snow
+    if (!pl.air) pos.addScaledVector(pl.n, Math.abs(Math.sin(pl.pitch)) * 0.7);
     m.stance = this.settings.stance;
     m.setBoard(pos, bx, by);
     const P = m.pose;
@@ -623,6 +627,8 @@ const Game = {
     if (P.grabAmt < 0.02) P.grab = null;
     P.twist = damp(P.twist, clamp(pl.spinVel * 0.06, -0.5, 0.5), 8, dt);
     P.look = 0.72; P.lookDir = pl.ride;
+    // weight over the pressed end
+    P.press = damp(P.press || 0, pl.air ? 0 : -Math.sign(pl.pitch) * Math.min(1, Math.abs(pl.pitch) * 4), 10, dt);
     P.wave += dt * (1 + pl.speed * 0.1);
     m.solvePose(dt); m.draw();
   },
@@ -639,8 +645,15 @@ const Game = {
     if (avg > 1 / 42 && P.scale > 0.55) { P.scale = Math.max(0.55, P.scale - 0.1); this.onResize(); }
     else if (avg < 1 / 57 && P.scale < 1) { P.scale = Math.min(1, P.scale + 0.05); this.onResize(); }
   },
+  // run the game forward without drawing (headless checks and screenshots on slow renderers)
+  simulate(sec, fps = 60) {
+    this.noRender = true;
+    const n = Math.round(sec * fps);
+    for (let i = 0; i < n; i++) { this.fakeNow = this.last + 1000 / fps; this.loop(); }
+    this.fakeNow = null; this.noRender = false; this.last = performance.now();
+  },
   loop() {
-    const now = performance.now();
+    const now = this.fakeNow ?? performance.now();
     const raw = (now - this.last) / 1000;
     if (!this.testMode) this.perfTick(Math.min(raw, 0.5));
     let rdt = Math.min(0.05, raw);
@@ -676,10 +689,10 @@ const Game = {
     Structures.update(rdt, Sky.night);
     Sky.update(rdt, this.cam, st === 'ride' || st === 'paused' ? Player.pos : this.cam.position.clone().setY(World.height(this.cam.position.x, this.cam.position.z)), st === 'map' ? 'map' : 'ride');
     this.updateLamps();
-    if (st === 'ride') { FX.boardSpray(dt, Player); FX.trailUpdate(Player); this.speedMotes(dt); }
+    if (st === 'ride') { FX.boardSpray(dt, Player); FX.railSpray(dt, Player); FX.trailUpdate(Player); this.speedMotes(dt); }
     if (st === 'ride' || st === 'title' || st === 'locker' || st === 'lift') FX.emitAmbient(dt, this.cam, Sky.night, Sky.weather.wind);
     FX.update(dt);
-    FX.light.value.copy(Sky.hemi.color).multiplyScalar(Sky.hemi.intensity).add(new THREE.Color(Sky.sun.color).multiplyScalar(Sky.sun.intensity * 0.3));
+    FX.updateLight(this.cam);
     FX.glowU.uOn.value = U.uLampOn.value;
     if (st !== 'ride') FX.updateTokens(U.uTime.value, null, () => {});
     TerrainMesh.update(this.cam);
@@ -704,7 +717,7 @@ const Game = {
     Post.uni.uSat.value = this.slowmo ? 0.85 : 1.08;
     Post.uni.uGrade.value = 1 - Sky.night;
     const hov = st === 'map' ? (MapView.hover >= 0 ? MapView.hover : MapView.selected) : -1;
-    Post.render(this.scene, this.cam, hov >= 0 ? Structures.lifts[hov].layer : null);
+    if (!this.noRender) Post.render(this.scene, this.cam, hov >= 0 ? Structures.lifts[hov].layer : null);
     Input.endFrame();
   },
   // ice crystals hanging in the air ahead: they whip past the lens at speed
@@ -717,7 +730,7 @@ const Game = {
     while (n-- > 0) {
       const d = 5 + Math.random() * 20, x = (Math.random() - 0.5) * 16, y = (Math.random() - 0.4) * 7;
       const p = new V3().copy(c.position).addScaledVector(f, d).addScaledVector(r, x).addScaledVector(u, y);
-      FX.spawn(p.x, p.y, p.z, Sky.weather.wind * 1.5, -0.2, 0, 1.1, 0.05, 0.05, 0.55, 1, 1, 1, 0.01, 0.2);
+      FX.spawn(p.x, p.y, p.z, Sky.weather.wind * 1.5, -0.2, 0, 1.1, 0.04, 0.04, 0.6, 1, 1, 1, 0.01, 0.2, 1, 1, 0);
     }
   },
   drawIdle(dt) {
