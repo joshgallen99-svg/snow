@@ -259,6 +259,17 @@ RUNS.push(
     ],
   },
   {
+    id: 'kogane', name: 'Kogane Traverse', diff: 'green', lift: 'birch', w: 11, groomed: true, bank: 1.0, cattrack: true,
+    blurb: 'A mid-mountain cat track that weaves back and forth across Center Course and Wonderland to the Century Express.',
+    pts: [[95, -420], [-42, -361], [-90, -311], [35, -185], [44, -118], [1, -103], [-193, 16], [-220, 75], [-109, 152], [-211, 283], [-290, 290]],
+    features: [
+      { k: 'forest', t0: 0, t1: 1, d: 0.85 },
+      { k: 'sidehits', t0: 0.05, t1: 0.95, gap: 36, h: 1.0 },
+      { k: 'log', t: 0.47, len: 7, lat: 7, ang: 0.2 },
+      { k: 'kicker', t: 0.72, size: 0, lat: 0 },
+    ],
+  },
+  {
     id: 'snakegully', name: 'Snake Gully', diff: 'red', lift: 'kita', w: 15, groomed: false, bank: 1.6,
     blurb: 'A winding natural halfpipe down the north-east flank. Pump the walls and keep it moving.',
     pts: [[128, -1020], [184, -1074], [196, -1148], [286, -1172], [280, -1262], [399, -1259], [337, -1396]],
