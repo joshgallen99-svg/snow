@@ -3926,7 +3926,7 @@ const Lights = {
         #include <fog_pars_fragment>
         void main(){
           // softer toward the end of the cone, and faded where it would slice into the camera
-          float a = pow(1.0 - vT, 1.6) * smoothstep(0.0, 0.08, vT);
+          float a = pow(clamp(1.0 - vT, 0.0, 1.0), 1.6) * smoothstep(0.0, 0.08, vT);
           float near = smoothstep(1.5, 8.0, distance(vW, cameraPosition));
           float k = a * near * uOn * vB * (0.04 + uHaze * 0.2);
           gl_FragColor = vec4(vC * k, 1.0);
@@ -6806,7 +6806,7 @@ const Post = {
     const vs = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
     this.brightMat = new THREE.ShaderMaterial({
       uniforms: { tScene: { value: this.sceneRT.texture }, uExposure: { value: 1 }, uThr: { value: 1.1 } }, vertexShader: vs, depthTest: false, depthWrite: false,
-      fragmentShader: 'uniform sampler2D tScene; uniform float uExposure, uThr; varying vec2 vUv; void main(){ vec3 c = texture2D(tScene, vUv).rgb * uExposure; float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); gl_FragColor = vec4(c * smoothstep(uThr, uThr + 0.8, l), 1.0); }',
+      fragmentShader: 'uniform sampler2D tScene; uniform float uExposure, uThr; varying vec2 vUv; void main(){ vec3 c = texture2D(tScene, vUv).rgb * uExposure; float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); if (!(l < 60000.0)) { c = vec3(0.0); l = 0.0; } gl_FragColor = vec4(c * smoothstep(uThr, uThr + 0.8, l), 1.0); }',
     });
     this.blurMat = new THREE.ShaderMaterial({
       uniforms: { tSrc: { value: null }, uDir: { value: new THREE.Vector2() } }, vertexShader: vs, depthTest: false, depthWrite: false,
@@ -6836,12 +6836,14 @@ const Post = {
         void main(){
           vec2 uv = vUv;
           vec3 col = texture2D(tScene, uv).rgb;
+          // a NaN or infinite pixel from any shader must not turn into a black hole
+          if (!(dot(col, vec3(1.0)) < 1e5)) col = vec3(0.8);
           // radial speed blur toward the edges
           if (uSpeed > 0.01) {
             vec2 d = uv - 0.5; float r = length(d);
             vec3 acc = col; float k = uSpeed * 0.045;
             for (int i = 1; i <= 7; i++) acc += texture2D(tScene, uv - d * k * float(i) / 7.0).rgb;
-            col = mix(col, acc / 8.0, smoothstep(0.12, 0.55, r));
+            if (dot(acc, vec3(1.0)) < 1e6) col = mix(col, acc / 8.0, smoothstep(0.12, 0.55, r));
           }
           col *= uExposure;
           col += texture2D(tBloom, uv).rgb * uBloom;

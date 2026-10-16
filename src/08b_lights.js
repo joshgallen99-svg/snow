@@ -310,7 +310,7 @@ const Lights = {
         #include <fog_pars_fragment>
         void main(){
           // softer toward the end of the cone, and faded where it would slice into the camera
-          float a = pow(1.0 - vT, 1.6) * smoothstep(0.0, 0.08, vT);
+          float a = pow(clamp(1.0 - vT, 0.0, 1.0), 1.6) * smoothstep(0.0, 0.08, vT);
           float near = smoothstep(1.5, 8.0, distance(vW, cameraPosition));
           float k = a * near * uOn * vB * (0.04 + uHaze * 0.2);
           gl_FragColor = vec4(vC * k, 1.0);
