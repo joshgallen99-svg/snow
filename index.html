@@ -6994,7 +6994,7 @@ const MapView = {
         void main(){
           vec2 p = vUv - 0.5; float r = length(p) * 2.0;
           float f = n(vUv * 4.0 + vSeed * 10.0 + uTime * 0.02) * 0.6 + n(vUv * 9.0 - vSeed * 7.0) * 0.4;
-          float a = smoothstep(1.0, 0.2, r + (f - 0.5) * 0.7) * vA * 0.92;
+          float a = (1.0 - smoothstep(0.2, 1.0, r + (f - 0.5) * 0.7)) * vA * 0.92;
           if (a < 0.01) discard;
           vec3 col = uLight * mix(0.82, 1.05, f) * mix(1.0, 0.9, r);
           gl_FragColor = vec4(col, a);

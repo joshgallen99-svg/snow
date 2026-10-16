@@ -10,7 +10,8 @@ const [script, quality = 'medium', time = '11.5', weather = 'clear', W = '1280',
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: +W, height: +H } });
 page.setDefaultTimeout(300000);
-await page.addInitScript(([q, t, w]) => { localStorage.setItem('kitakaze-peak.v1', JSON.stringify({ settings: { quality: q, time: t, weather: w, unlockAll: true, music: 0, sfx: 0 } })); }, [quality, time, weather]);
+// LOCKED=1 keeps the lifts locked (cloud cover on the map)
+await page.addInitScript(([q, t, w, u]) => { localStorage.setItem('kitakaze-peak.v1', JSON.stringify({ settings: { quality: q, time: t, weather: w, unlockAll: u, music: 0, sfx: 0 } })); }, [quality, time, weather, !process.env.LOCKED]);
 const errs = [];
 page.on('pageerror', (e) => errs.push(e.message));
 page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
