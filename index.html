@@ -49,7 +49,11 @@ button { font: inherit; color: inherit; }
 
 /* loading */
 #loading { position: fixed; inset: 0; display: grid; place-items: center; background: radial-gradient(120% 90% at 50% 100%, #1b2c4a 0%, #0b1220 60%); z-index: 50; }
-#loading .wrap { width: min(420px, calc(100vw - 48px)); text-align: center; }
+#loading .wrap { width: min(420px, calc(100vw - 48px)); text-align: center; position: relative; z-index: 1; }
+#loading .flakes { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+#loading .flakes i { position: absolute; top: -10px; border-radius: 50%; background: #e8f0fb; opacity: .7; animation: fall linear infinite; }
+@keyframes fall { to { transform: translate(var(--dx), 110vh); } }
+@media (prefers-reduced-motion: reduce) { #loading .flakes { display: none; } }
 #loading .kanji { font-family: var(--f-display); font-size: 64px; letter-spacing: .1em; color: var(--snow); }
 #loading .name { font-family: var(--f-display); font-size: 22px; letter-spacing: .35em; text-transform: uppercase; margin: 4px 0 28px; color: var(--muted); }
 .bar { height: 4px; background: rgba(255,255,255,.12); border-radius: 4px; overflow: hidden; }
@@ -210,6 +214,8 @@ kbd { display: inline-block; min-width: 18px; padding: 2px 7px; border-radius: 6
 <div id="game"></div>
 
 <div id="loading">
+  <div class="flakes" id="loadFlakes"></div>
+  <script>(() => { const f = document.getElementById('loadFlakes'); for (let i = 0; i < 70; i++) { const e = document.createElement('i'), s = 2 + Math.random() * 4; e.style.cssText = `left:${Math.random() * 100}%;width:${s}px;height:${s}px;opacity:${0.25 + s / 8};animation-duration:${6 + Math.random() * 8}s;animation-delay:${-Math.random() * 12}s;--dx:${(Math.random() - 0.3) * 120}px`; f.appendChild(e); } })();</script>
   <div class="wrap">
     <div class="kanji" aria-hidden="true">北風</div>
     <div class="name">Kitakaze Peak</div>
