@@ -195,7 +195,9 @@ const TerrainMesh = {
         float floorKeep = smoothstep(0.35, 0.62, d) * 0.12;
         return d * (1.0 - cs * (1.0 - floorKeep) + max(0.0, nb - cs) * 0.5);
       }
-      float snowY(vec2 loc, out float comp) { vec2 w = loc + uOrigin; return hAt(w) + snowDepth(loc, w, comp); }
+      // fresh snow doesn't stick on steep faces: set per vertex from the ground slope
+      float gSlopeK = 1.0;
+      float snowY(vec2 loc, out float comp) { vec2 w = loc + uOrigin; return hAt(w) + snowDepth(loc, w, comp) * gSlopeK; }
     `;
     patchStandard(mat, {
       key: overlay ? 'terrainSnow' : 'terrain',
@@ -273,6 +275,12 @@ const TerrainMesh = {
         sh.vertexShader = sh.vertexShader.replace('#include <beginnormal_vertex>', /* glsl */`
           vec2 sLoc = position.xz;
           float sComp, sTmp;
+          {
+            vec2 w0 = sLoc + uOrigin;
+            float gx = hAt(w0 + vec2(1.5, 0.0)) - hAt(w0 - vec2(1.5, 0.0)), gz = hAt(w0 + vec2(0.0, 1.5)) - hAt(w0 - vec2(0.0, 1.5));
+            float grade = length(vec2(gx, gz)) / 3.0;
+            gSlopeK = 1.0 - smoothstep(0.55, 1.1, grade) * 0.8;
+          }
           float sY = snowY(sLoc, sComp);
           float e = 0.12;
           float yx1 = snowY(sLoc + vec2(e, 0.0), sTmp), yx0 = snowY(sLoc - vec2(e, 0.0), sTmp);
@@ -311,7 +319,7 @@ const TerrainMesh = {
             float cx1 = texture(uComp, vCuv + vec2(cpx, 0.0)).r, cx0 = texture(uComp, vCuv - vec2(cpx, 0.0)).r;
             float cz1 = texture(uComp, vCuv + vec2(0.0, cpx)).r, cz0 = texture(uComp, vCuv - vec2(0.0, cpx)).r;
             float k = vDepth / max(vComp < 0.99 ? (1.0 - vComp) : 1.0, 0.05) / (2.0 * uSize * cpx);
-            pw += vec3(cx1 - cx0, 0.0, cz1 - cz0) * clamp(k, 0.0, 6.0);
+            pw += vec3(cx1 - cx0, 0.0, cz1 - cz0) * clamp(k, 0.0, 3.0);
           }` : ''}
           normal = normalize(normal + (viewMatrix * vec4(pw, 0.0)).xyz);
         }

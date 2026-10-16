@@ -78,15 +78,17 @@ const World = {
           const angle = [18, 21, 24, 26][f.size] * DEG;
           const lip = clamp(((Math.tan(angle) + s0) * len) / p, K[1], K[1] * 1.3);
           this.kickers.push({ x0, z0, dx: c.tx, dz: c.tz, len, lip, p, w: K[2], back: 1.6 + lip * 0.3, size: f.size, run: run.index });
-        } else if (f.k === 'box' || f.k === 'rail') {
+        } else if (f.k === 'box' || f.k === 'rail' || f.k === 'log') {
           const c = this.pathAt(rd, f.t * L);
+          // jibs can sit at an angle to the run
+          if (f.ang) { const ca = Math.cos(f.ang), sa = Math.sin(f.ang), tx = c.tx * ca - c.tz * sa, tz = c.tx * sa + c.tz * ca; c.tx = tx; c.tz = tz; }
           const nx = -c.tz, nz = c.tx;
           const cx = c.x + nx * (f.lat || 0), cz = c.z + nz * (f.lat || 0);
           const ax = cx - c.tx * f.len * 0.5, az = cz - c.tz * f.len * 0.5;
           const bx = cx + c.tx * f.len * 0.5, bz = cz + c.tz * f.len * 0.5;
-          const h = f.k === 'box' ? 0.55 : (f.h || 0.9);
+          const h = f.k === 'box' ? 0.55 : f.k === 'log' ? (f.h || 0.45) : (f.h || 0.9);
           const ay = this.height(ax, az) + h, by = this.height(bx, bz) + h;
-          const gr = { kind: f.k, ax, az, ay, bx, bz, by, dx: c.tx, dz: c.tz, len: f.len, w: f.k === 'box' ? 0.5 : 0.07, h, run: run.index };
+          const gr = { kind: f.k, ax, az, ay, bx, bz, by, dx: c.tx, dz: c.tz, len: f.len, w: f.k === 'box' ? 0.5 : f.k === 'log' ? 0.2 : 0.07, h, run: run.index };
           this.grinds.push(gr);
           // solid sides: you get onto a box from its ramp and onto a rail with an ollie
           this.addBoxCollider(cx, cz, f.len / 2, gr.w + 0.04, Math.atan2(-c.tz, c.tx), Math.max(ay, by) - 0.06, f.k, gr);

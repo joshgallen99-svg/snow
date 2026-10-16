@@ -223,7 +223,7 @@ kbd { display: inline-block; min-width: 18px; padding: 2px 7px; border-radius: 6
 <section id="title" class="glass" hidden>
   <div class="kanji" aria-hidden="true">北風</div>
   <h1>Kitakaze Peak</h1>
-  <p>A volcano resort in deep snow country. Eight lifts, thirteen runs, and all the powder you can find.</p>
+  <p>A volcano resort in deep snow country. Nine lifts, sixteen runs, and all the powder you can find.</p>
   <div class="menu">
     <button class="btn primary" id="bRide"><span>Ride the mountain</span><span>Live cam</span></button>
     <button class="btn" id="bLocker"><span>Gear locker</span><span id="bLockerNote">Boards &amp; outfits</span></button>
@@ -566,6 +566,8 @@ const LIFTS = [
   { id: 'peak',     name: 'Peak Pair Lift',    type: 'pair',    a: [-60, -300],  b: [70, -690],    unlock: 5, color: 0x6b4f9a },
   { id: 'east',     name: 'East Ridge Quad',   type: 'quad',    a: [880, 620],   b: [470, -260],   unlock: 6, color: 0x2b7f86 },
   { id: 'summit',   name: 'Summit T-Bar',      type: 'tbar',    a: [60, -700],   b: [100, -905],   unlock: 7, color: 0x8a6d3b },
+  // the back side: a quad up the north face from its own little base
+  { id: 'kita',     name: 'Kita Back Quad',    type: 'quad',    a: [273, -1425], b: [122, -1027], unlock: 4, color: 0x7a3f8f },
 ];
 
 // Feature positions use t = fraction of run length.
@@ -575,6 +577,12 @@ const RUNS = [
     blurb: 'Wide and mellow beside the village. Everyone starts here.',
     pts: [[-805, 870], [-770, 930], [-800, 990], [-850, 1048]],
     features: [
+      { k: 'log', t: 0.42, len: 12, lat: -11, h: 0.5 },
+      { k: 'rail', t: 0.76, len: 20, lat: 0, h: 0.8 },
+      { k: 'sidehits', t0: 0.15, t1: 0.5, gap: 40, h: 1.1 },
+      { k: 'kicker', t: 0.82, size: 0, lat: 6 },
+      { k: 'sidehits', t0: 0.15, t1: 0.9, gap: 34, h: 0.9 },
+      { k: 'log', t: 0.35, len: 7, lat: -16, ang: 0.25 },
       { k: 'kicker', t: 0.6, size: 0, lat: 8 },
       { k: 'forest', t0: 0, t1: 1, d: 0.3 },
       { k: 'lamps', t0: 0, t1: 1, gap: 50 },
@@ -596,6 +604,8 @@ const RUNS = [
     blurb: 'Banked turns, rollers and two booters straight back to the village.',
     pts: [[-288, 302], [-222, 430], [-240, 580], [-300, 720], [-362, 860], [-445, 990]],
     features: [
+      { k: 'halfpipe', t0: 0.52, t1: 0.68, h: 2.6 },
+      { k: 'sidehits', t0: 0.82, t1: 0.98, gap: 36, h: 1.3 },
       { k: 'forest', t0: 0, t1: 1, d: 0.9 },
       { k: 'rollers', t0: 0.12, t1: 0.35, amp: 1.2, wl: 30 },
       { k: 'kicker', t: 0.45, size: 1, lat: -4 },
@@ -608,6 +618,10 @@ const RUNS = [
     blurb: 'The long way home: a cat track along the ravine rim with views over the valley.',
     pts: [[-142, -222], [-262, -178], [-392, -82], [-470, 80], [-560, 250], [-622, 430], [-682, 620], [-662, 800], [-602, 942]],
     features: [
+      { k: 'log', t: 0.3, len: 9, lat: 9, ang: -0.2 },
+      { k: 'log', t: 0.42, len: 8, lat: -9, ang: 0.3 },
+      { k: 'rollers', t0: 0.15, t1: 0.25, amp: 0.8, wl: 26 },
+      { k: 'sidehits', t0: 0.6, t1: 0.9, gap: 45, h: 1.2 },
       { k: 'forest', t0: 0, t1: 0.25, d: 0.4 },
       { k: 'forest', t0: 0.25, t1: 1, d: 0.85 },
       { k: 'guns', t0: 0.6, t1: 0.95, gap: 70 },
@@ -619,6 +633,8 @@ const RUNS = [
     blurb: 'Fast, rolling groomer from the gondola through the birch forest.',
     pts: [[-112, -218], [-152, -62], [-118, 120], [-160, 282], [-176, 412]],
     features: [
+      { k: 'sidehits', t0: 0.05, t1: 0.25, gap: 36, h: 1.4 },
+      { k: 'kicker', t: 0.88, size: 0, lat: -7 },
       { k: 'forest', t0: 0, t1: 1, d: 0.9 },
       { k: 'rollers', t0: 0.25, t1: 0.6, amp: 1.4, wl: 36 },
       { k: 'kicker', t: 0.7, size: 1, lat: 0 },
@@ -648,6 +664,9 @@ const RUNS = [
     blurb: 'The big wide groomer down the middle of the mountain. Let it run.',
     pts: [[105, -410], [80, -250], [30, -80], [-20, 100], [-90, 262], [-158, 416]],
     features: [
+      { k: 'rollers', t0: 0.15, t1: 0.32, amp: 1.3, wl: 34 },
+      { k: 'kicker', t: 0.4, size: 1, lat: -8 },
+      { k: 'sidehits', t0: 0.62, t1: 0.95, gap: 42, h: 1.6 },
       { k: 'forest', t0: 0, t1: 1, d: 0.75 },
       { k: 'kicker', t: 0.55, size: 2, lat: 6 },
       { k: 'lamps', t0: 0.6, t1: 1, gap: 55 },
@@ -658,6 +677,10 @@ const RUNS = [
     blurb: 'Open birch stands and soft snow. Pick a line and keep your eyes up.',
     pts: [[140, -405], [160, -250], [130, -60], [80, 120], [-10, 300], [-140, 428]],
     features: [
+      { k: 'pillows', t0: 0.15, t1: 0.75, d: 0.3 },
+      { k: 'log', t: 0.3, len: 9, lat: 8, ang: 0.4 },
+      { k: 'log', t: 0.58, len: 10, lat: -10, ang: -0.35 },
+      { k: 'drop', t: 0.82, h: 2 },
       { k: 'forest', t0: 0, t1: 1, d: 0.9 },
       { k: 'glade', t0: 0.1, t1: 0.9, d: 0.5 },
       { k: 'powder', t0: 0, t1: 1 },
@@ -669,6 +692,7 @@ const RUNS = [
     blurb: 'Steep fall-line moguls right under the pair lift.',
     pts: [[52, -676], [22, -560], [-18, -440], [-52, -318]],
     features: [
+      { k: 'drop', t: 0.93, h: 2 },
       { k: 'forest', t0: 0, t1: 1, d: 0.35 },
       { k: 'moguls', t0: 0.1, t1: 0.9, amp: 0.9 },
     ],
@@ -678,6 +702,9 @@ const RUNS = [
     blurb: 'Rides the east spur from treeline to the east base. Big views the whole way.',
     pts: [[82, -676], [240, -640], [400, -560], [560, -450], [700, -300], [800, -80], [860, 150], [900, 380], [886, 598]],
     features: [
+      { k: 'sidehits', t0: 0.05, t1: 0.4, gap: 48, h: 1.6 },
+      { k: 'kicker', t: 0.35, size: 1, lat: 4 },
+      { k: 'rollers', t0: 0.88, t1: 0.97, amp: 1.0, wl: 30 },
       { k: 'forest', t0: 0, t1: 0.3, d: 0.1 },
       { k: 'forest', t0: 0.3, t1: 1, d: 0.7 },
       { k: 'rollers', t0: 0.45, t1: 0.6, amp: 1.5, wl: 40 },
@@ -689,6 +716,7 @@ const RUNS = [
     blurb: 'Drop the cornice off the summit into the open cone. Deep, wind-blown and committing.',
     pts: [[88, -888], [10, -850], [-80, -760], [-150, -620], [-170, -470], [-122, -332], [-76, -306]],
     features: [
+      { k: 'pillows', t0: 0.55, t1: 0.95, d: 0.3, h: 1.2 },
       { k: 'forest', t0: 0, t1: 0.7, d: 0.0 },
       { k: 'forest', t0: 0.7, t1: 1, d: 0.3 },
       { k: 'powder', t0: 0, t1: 1 },
@@ -702,6 +730,8 @@ const RUNS = [
     blurb: 'A rock-walled chute off the summit that opens into a fall-line rip.',
     pts: [[112, -890], [175, -815], [215, -690], [232, -550], [242, -400], [252, -200], [230, 0], [170, 200], [60, 360], [-118, 446]],
     features: [
+      { k: 'halfpipe', t0: 0.32, t1: 0.52, h: 3.2 },
+      { k: 'pillows', t0: 0.7, t1: 0.9, d: 0.25 },
       { k: 'forest', t0: 0, t1: 0.3, d: 0.0 },
       { k: 'forest', t0: 0.3, t1: 1, d: 0.85 },
       { k: 'rocks', t0: 0.03, t1: 0.22, n: 8 },
@@ -715,6 +745,9 @@ const RUNS = [
     blurb: 'The east side stash. Deep, untracked and full of pillows.',
     pts: [[470, -238], [470, -60], [520, 120], [610, 300], [720, 460], [860, 606]],
     features: [
+      { k: 'pillows', t0: 0.1, t1: 0.8, d: 0.4, h: 1.2 },
+      { k: 'log', t: 0.25, len: 10, lat: 10, ang: 0.3 },
+      { k: 'log', t: 0.62, len: 9, lat: -12, ang: -0.4 },
       { k: 'forest', t0: 0, t1: 1, d: 0.7 },
       { k: 'powder', t0: 0, t1: 1 },
       { k: 'glade', t0: 0.1, t1: 0.9, d: 0.3 },
@@ -723,6 +756,45 @@ const RUNS = [
     ],
   },
 ];
+// ---- the back side: three ways down the north face, two of them crossing the traverse ----
+RUNS.push(
+  {
+    id: 'urabowl', name: 'Ura Bowl', diff: 'black', lift: 'kita', w: 36, groomed: false, bank: 0.2,
+    blurb: 'The back bowl: steep, wind-loaded and full of pillows, with the traverse cutting across it twice.',
+    pts: [[103, -1025], [69, -1097], [92, -1170], [17, -1238], [73, -1329], [147, -1398], [256, -1430]],
+    features: [
+      { k: 'forest', t0: 0, t1: 0.55, d: 0.05 },
+      { k: 'forest', t0: 0.55, t1: 1, d: 0.5 },
+      { k: 'powder', t0: 0, t1: 1 },
+      { k: 'pillows', t0: 0.2, t1: 0.85, d: 0.38, h: 1.3 },
+      { k: 'rocks', t0: 0.1, t1: 0.6, n: 9 },
+      { k: 'drop', t: 0.42, h: 3 },
+    ],
+  },
+  {
+    id: 'kitatraverse', name: 'Kita Traverse', diff: 'green', lift: 'kita', w: 12, groomed: true, bank: 1.1, cattrack: true,
+    blurb: 'A cat track that switchbacks right across the back side, over the bowl and the gully and back again.',
+    pts: [[116, -1026], [73, -1041], [-8, -1045], [-72, -1001], [-115, -985], [-129, -1034], [-16, -1226], [194, -1304], [448, -1138], [470, -1178], [463, -1248], [289, -1418]],
+    features: [
+      { k: 'forest', t0: 0, t1: 0.25, d: 0.2 },
+      { k: 'forest', t0: 0.25, t1: 1, d: 0.8 },
+      { k: 'sidehits', t0: 0.1, t1: 0.95, gap: 38, h: 1.0 },
+      { k: 'log', t: 0.55, len: 8, lat: -8, ang: 0.15 },
+      { k: 'lamps', t0: 0.0, t1: 1, gap: 70 },
+    ],
+  },
+  {
+    id: 'snakegully', name: 'Snake Gully', diff: 'red', lift: 'kita', w: 15, groomed: false, bank: 1.6,
+    blurb: 'A winding natural halfpipe down the north-east flank. Pump the walls and keep it moving.',
+    pts: [[128, -1020], [184, -1074], [196, -1148], [286, -1172], [280, -1262], [399, -1259], [337, -1396]],
+    features: [
+      { k: 'forest', t0: 0, t1: 1, d: 0.85 },
+      { k: 'halfpipe', t0: 0.05, t1: 0.92, h: 3.8 },
+      { k: 'rollers', t0: 0.4, t1: 0.55, amp: 0.9, wl: 28 },
+      { k: 'log', t: 0.7, len: 8, lat: 0, h: 0.45 },
+    ],
+  },
+);
 const RUN_BY_ID = Object.fromEntries(RUNS.map((r, i) => [r.id, Object.assign(r, { index: i })]));
 const LIFT_BY_ID = Object.fromEntries(LIFTS.map((l, i) => [l.id, Object.assign(l, { index: i })]));
 
@@ -968,8 +1040,44 @@ function profileOffset(run, path, s) {
 }
 
 function lateralShape(run, path, s, lat) {
-  // moguls: staggered bumps
   let off = 0;
+  const W = run.w, al = Math.abs(lat);
+  // shaped features (walls, pillows, side hits) smooth out where another run crosses
+  const calm = path.cross ? 1 - path.cross[clamp(Math.round(s / path.step), 0, path.n - 1)] : 1;
+  if (calm <= 0.001) return 0;
+  for (const f of run.features) {
+    const a = (f.t0 ?? 0) * path.len, b = (f.t1 ?? 1) * path.len;
+    if (f.k === 'halfpipe' && s > a && s < b) {
+      // a natural gully: the run's sides curl up into walls you can carve up and air out of
+      const env = sstep(a, a + 30, s) * sstep(b, b - 30, s) * calm;
+      const u = clamp(al / (W * 0.95), 0, 1.25);
+      off += f.h * env * Math.pow(u, 2.4) - f.h * env * 0.15;
+    } else if (f.k === 'pillows' && s > a && s < b) {
+      // snow-covered stumps and boulders: round mounds to pop off or drop over
+      const cs = 15, cl = 10;
+      const ci = Math.floor(s / cs), cj = Math.floor(lat / cl);
+      for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) {
+        const i = ci + di, j = cj + dj;
+        const hsh = hash2i(i * 7 + run.index * 131, j);
+        if (hsh > (f.d ?? 0.35)) continue;
+        const ms = (i + 0.2 + hash2i(i, j + 99) * 0.6) * cs, ml = (j + 0.2 + hash2i(i + 77, j) * 0.6) * cl;
+        if (Math.abs(ml) > W * 0.85) continue;
+        const r = 2.4 + hash2i(i + 5, j + 5) * 2.2, h = (0.8 + hash2i(i + 9, j + 3) * 1.4) * (f.h ?? 1);
+        const q = 1 - ((s - ms) ** 2 + (lat - ml) ** 2) / (r * r);
+        if (q > 0) off += h * q * q * calm;
+      }
+    } else if (f.k === 'sidehits' && s > a && s < b) {
+      // wedges of snow along the edges, alternating sides, to launch off as you carve
+      const gap = f.gap || 40, i = Math.floor((s - a) / gap), u = (s - a) / gap - i;
+      const side = i % 2 ? 1 : -1;
+      if (lat * side > 0) {
+        const along = Math.sin(clamp(u * 2.2, 0, 1) * Math.PI);
+        const across = sstep(W * 0.45, W * 0.78, al) * (1 - sstep(W * 0.95, W * 1.15, al));
+        off += (f.h ?? 1.4) * along * across * calm;
+      }
+    }
+  }
+  // moguls: staggered bumps
   for (const f of run.features) {
     if (f.k !== 'moguls') continue;
     const a = f.t0 * path.len, b = f.t1 * path.len;
@@ -1062,6 +1170,26 @@ function generateTerrain(progress) {
       const prof = computeProfile(run, path, sample);
       runData.push({ run, path, prof });
     }
+    // where runs cross or merge, mark the stretch so shaped features fade out there
+    for (const rd of runData) {
+      const P = rd.path, c = new Float32Array(P.n);
+      for (let i = 0; i < P.n; i++) {
+        const [x, z] = P.pts[i];
+        for (const o of runData) {
+          if (o === rd) continue;
+          const lim = (rd.run.w + o.run.w) * 0.9 + 12;
+          for (let j = 0; j < o.path.n; j += 2) {
+            const q = o.path.pts[j];
+            if (Math.abs(q[0] - x) < lim && Math.abs(q[1] - z) < lim && Math.hypot(q[0] - x, q[1] - z) < lim) { c[i] = 1; break; }
+          }
+          if (c[i]) break;
+        }
+      }
+      // soften the edges of each zone over ~30 m
+      const out = new Float32Array(P.n), R = Math.round(30 / P.step);
+      for (let i = 0; i < P.n; i++) { let m = 0; for (let k = -R; k <= R; k++) { const j = clamp(i + k, 0, P.n - 1); if (c[j]) m = Math.max(m, 1 - Math.abs(k) / (R + 1)); } out[i] = m; }
+      P.cross = out;
+    }
   });
   steps.push(() => {
     for (const rd of runData) {
@@ -1111,6 +1239,7 @@ function generateTerrain(progress) {
         target = lerp(target, target + (nat - yBase) * crossKeep * sstep(0, W, d), 1);
         const inner = (1 - sstep(W * 0.8, W + E, d)) * endFade;
         if (inner <= 0) continue;
+        // a cat track wins where it crosses another run: it stays a smooth bench across the slope
         const w = inner * inner + 1e-4;
         sumW[idx] += w; sumWT[idx] += w * target;
         if (inner > maxIn[idx]) {
@@ -1238,15 +1367,17 @@ const World = {
           const angle = [18, 21, 24, 26][f.size] * DEG;
           const lip = clamp(((Math.tan(angle) + s0) * len) / p, K[1], K[1] * 1.3);
           this.kickers.push({ x0, z0, dx: c.tx, dz: c.tz, len, lip, p, w: K[2], back: 1.6 + lip * 0.3, size: f.size, run: run.index });
-        } else if (f.k === 'box' || f.k === 'rail') {
+        } else if (f.k === 'box' || f.k === 'rail' || f.k === 'log') {
           const c = this.pathAt(rd, f.t * L);
+          // jibs can sit at an angle to the run
+          if (f.ang) { const ca = Math.cos(f.ang), sa = Math.sin(f.ang), tx = c.tx * ca - c.tz * sa, tz = c.tx * sa + c.tz * ca; c.tx = tx; c.tz = tz; }
           const nx = -c.tz, nz = c.tx;
           const cx = c.x + nx * (f.lat || 0), cz = c.z + nz * (f.lat || 0);
           const ax = cx - c.tx * f.len * 0.5, az = cz - c.tz * f.len * 0.5;
           const bx = cx + c.tx * f.len * 0.5, bz = cz + c.tz * f.len * 0.5;
-          const h = f.k === 'box' ? 0.55 : (f.h || 0.9);
+          const h = f.k === 'box' ? 0.55 : f.k === 'log' ? (f.h || 0.45) : (f.h || 0.9);
           const ay = this.height(ax, az) + h, by = this.height(bx, bz) + h;
-          const gr = { kind: f.k, ax, az, ay, bx, bz, by, dx: c.tx, dz: c.tz, len: f.len, w: f.k === 'box' ? 0.5 : 0.07, h, run: run.index };
+          const gr = { kind: f.k, ax, az, ay, bx, bz, by, dx: c.tx, dz: c.tz, len: f.len, w: f.k === 'box' ? 0.5 : f.k === 'log' ? 0.2 : 0.07, h, run: run.index };
           this.grinds.push(gr);
           // solid sides: you get onto a box from its ramp and onto a rail with an ollie
           this.addBoxCollider(cx, cz, f.len / 2, gr.w + 0.04, Math.atan2(-c.tz, c.tx), Math.max(ay, by) - 0.06, f.k, gr);
@@ -2131,7 +2262,9 @@ const TerrainMesh = {
         float floorKeep = smoothstep(0.35, 0.62, d) * 0.12;
         return d * (1.0 - cs * (1.0 - floorKeep) + max(0.0, nb - cs) * 0.5);
       }
-      float snowY(vec2 loc, out float comp) { vec2 w = loc + uOrigin; return hAt(w) + snowDepth(loc, w, comp); }
+      // fresh snow doesn't stick on steep faces: set per vertex from the ground slope
+      float gSlopeK = 1.0;
+      float snowY(vec2 loc, out float comp) { vec2 w = loc + uOrigin; return hAt(w) + snowDepth(loc, w, comp) * gSlopeK; }
     `;
     patchStandard(mat, {
       key: overlay ? 'terrainSnow' : 'terrain',
@@ -2209,6 +2342,12 @@ const TerrainMesh = {
         sh.vertexShader = sh.vertexShader.replace('#include <beginnormal_vertex>', /* glsl */`
           vec2 sLoc = position.xz;
           float sComp, sTmp;
+          {
+            vec2 w0 = sLoc + uOrigin;
+            float gx = hAt(w0 + vec2(1.5, 0.0)) - hAt(w0 - vec2(1.5, 0.0)), gz = hAt(w0 + vec2(0.0, 1.5)) - hAt(w0 - vec2(0.0, 1.5));
+            float grade = length(vec2(gx, gz)) / 3.0;
+            gSlopeK = 1.0 - smoothstep(0.55, 1.1, grade) * 0.8;
+          }
           float sY = snowY(sLoc, sComp);
           float e = 0.12;
           float yx1 = snowY(sLoc + vec2(e, 0.0), sTmp), yx0 = snowY(sLoc - vec2(e, 0.0), sTmp);
@@ -2247,7 +2386,7 @@ const TerrainMesh = {
             float cx1 = texture(uComp, vCuv + vec2(cpx, 0.0)).r, cx0 = texture(uComp, vCuv - vec2(cpx, 0.0)).r;
             float cz1 = texture(uComp, vCuv + vec2(0.0, cpx)).r, cz0 = texture(uComp, vCuv - vec2(0.0, cpx)).r;
             float k = vDepth / max(vComp < 0.99 ? (1.0 - vComp) : 1.0, 0.05) / (2.0 * uSize * cpx);
-            pw += vec3(cx1 - cx0, 0.0, cz1 - cz0) * clamp(k, 0.0, 6.0);
+            pw += vec3(cx1 - cx0, 0.0, cz1 - cz0) * clamp(k, 0.0, 3.0);
           }` : ''}
           normal = normalize(normal + (viewMatrix * vec4(pw, 0.0)).xyz);
         }
@@ -3070,7 +3209,7 @@ const Structures = {
       const m = new THREE.Mesh(g, stdMat({ flatShading: false, roughness: 0.75 }, { key: 'kicker' }));
       m.receiveShadow = true; m.castShadow = true; this.group.add(m);
     }
-    const b = new GeoBuilder();
+    const b = new GeoBuilder(), lb = new GeoBuilder();
     for (const gr of World.grinds) {
       const mx = (gr.ax + gr.bx) / 2, mz = (gr.az + gr.bz) / 2, my = (gr.ay + gr.by) / 2;
       const ry = Math.atan2(gr.dx, gr.dz);
@@ -3081,6 +3220,17 @@ const Structures = {
         // snow on-ramp
         const sx = gr.ax - gr.dx * 0.9, sz = gr.az - gr.dz * 0.9;
         b.add(G.box(gr.w * 2 + 0.6, gr.h, 1.8), { x: sx, y: World.height(sx, sz) + gr.h / 2 - 0.25, z: sz, ry, rx: 0.3, color: 0xe8eef6 });
+      } else if (gr.kind === 'log') {
+        // a fallen tree, bark-dark with snow along its top, on a couple of stumps
+        lb.add(G.cyl(0.2, 0.24, gr.len, 9), { x: mx, y: my - 0.2, z: mz, ry, rx: Math.PI / 2 + pitch, order: 'YXZ', color: 0x4a3a2e, colorFn: snowCap(0.5) });
+        lb.add(G.cyl(0.16, 0.2, 0.08, 9), { x: gr.bx, y: gr.by - 0.2, z: gr.bz, ry, rx: Math.PI / 2 + pitch, order: 'YXZ', color: 0xc9a77c });
+        for (const t of [0.2, 0.8]) {
+          const px = lerp(gr.ax, gr.bx, t), pz = lerp(gr.az, gr.bz, t), py = lerp(gr.ay, gr.by, t);
+          const gy = World.height(px, pz);
+          lb.add(G.cyl(0.16, 0.2, py - gy, 6), { x: px, y: (py + gy) / 2 - 0.25, z: pz, color: 0x3d3028 });
+        }
+        // a broken branch stub or two
+        lb.add(G.cyl(0.04, 0.07, 0.8, 5), { x: lerp(gr.ax, gr.bx, 0.45), y: lerp(gr.ay, gr.by, 0.45) + 0.1, z: lerp(gr.az, gr.bz, 0.45), rz: 0.7, ry, color: 0x4a3a2e });
       } else {
         b.add(G.cyl(0.055, 0.055, gr.len, 8), { x: mx, y: my, z: mz, ry, rx: Math.PI / 2 + pitch, order: 'YXZ', color: 0xd9dde2 });
         for (const t of [0.12, 0.88]) {
@@ -3091,6 +3241,7 @@ const Structures = {
       }
     }
     if (b.count) { const m = new THREE.Mesh(b.build(), this.metalMat); m.castShadow = true; m.receiveShadow = true; this.group.add(m); }
+    if (lb.count) { const m = new THREE.Mesh(lb.build(), this.propMat); m.castShadow = true; m.receiveShadow = true; this.group.add(m); }
   },
   buildCornices() {
     const b = new GeoBuilder();
@@ -4664,7 +4815,7 @@ const Player = {
     const G2 = this.grind;
     this.grind = null;
     const segs = G2.chain.concat(this.grindName(G2)).filter((n, i, a) => i === 0 || n !== a[i - 1]);
-    const name = (G2.spinOn ? `${G2.spinOn} on ` : '') + segs.join(' to ') + (G2.g.kind === 'box' ? ' (box)' : '');
+    const name = (G2.spinOn ? `${G2.spinOn} on ` : '') + segs.join(' to ') + (G2.g.kind === 'box' ? ' (box)' : G2.g.kind === 'log' ? ' (log)' : '');
     this.takeoff(false);
     this.air.ride = this.ride;
     this.air.fromGrind = true;
@@ -4678,8 +4829,8 @@ const Player = {
   collide() {
     const p = this.pos, R = 0.35, vel = this.vel;
     World.queryColliders(p.x, p.z, 4, this._col);
-    const limit = { tree: 8.5, rock: 6.5, building: 6, station: 6, cat: 6, tower: 7, pole: 7, gun: 7, sign: 7, box: 6.5, rail: 6.5 };
-    const names = { tree: 'Hugged a tree', rock: 'Hit a rock', building: 'Ran into a building', station: 'Hit the lift station', tower: 'Hit a lift tower', rail: 'Clipped the rail', box: 'Clipped the box', cat: 'Ran into a snowcat' };
+    const limit = { tree: 8.5, rock: 6.5, building: 6, station: 6, cat: 6, tower: 7, pole: 7, gun: 7, sign: 7, box: 6.5, rail: 6.5, log: 6.5 };
+    const names = { tree: 'Hugged a tree', rock: 'Hit a rock', building: 'Ran into a building', station: 'Hit the lift station', tower: 'Hit a lift tower', rail: 'Clipped the rail', box: 'Clipped the box', log: 'Tripped on a log', cat: 'Ran into a snowcat' };
     for (const c of this._col) {
       if (p.y > c.top) continue;
       // rocks are solid ground (World.groundHeight): ride over the small ones, the big ones act as walls
@@ -5076,7 +5227,7 @@ const Sky = {
 // eroded by a tiling noise texture so no two look alike. "Hard" particles are
 // crisp chunks of snow that catch the sun; soft ones are drifting powder.
 const FX = {
-  N: 12000, cursor: 0, _lc: new THREE.Color(),
+  N: 22000, cursor: 0, _lc: new THREE.Color(),
   init(scene) {
     const N = this.N;
     this.p = new Float32Array(N * 3); this.v = new Float32Array(N * 3);
@@ -5122,7 +5273,7 @@ const FX = {
           vec4 nz = texture2D(uNoise, rc * 0.32 + vec2(seed * 7.13, seed * 3.71));
           float n = nz.r * 0.6 + nz.g * 0.4;
           // soft: a cauliflower puff eroded by noise; hard: a chunk with a ragged edge
-          float soft = clamp((1.0 - r2) * 1.5 - (1.0 - n) * 0.95, 0.0, 1.0); soft = soft * soft * (3.0 - 2.0 * soft);
+          float soft = clamp((1.0 - r2) * 1.9 - (1.0 - n) * 0.8, 0.0, 1.0); soft = soft * soft * (3.0 - 2.0 * soft);
           float chunk = smoothstep(0.0, 0.22, 1.0 - sqrt(r2) - (nz.b - 0.5) * 0.55);
           float alpha = mix(soft, chunk, hard) * vA;
           if (alpha < 0.004) discard;
@@ -5184,7 +5335,7 @@ const FX = {
     C[i * 3] = r; C[i * 3 + 1] = g; C[i * 3 + 2] = b;
     M[i * 3] = Math.random(); M[i * 3 + 1] = hard; M[i * 3 + 2] = lit;
     this.grav[i] = grav; this.drag[i] = drag; this.flags[i] = flags;
-    if (flags & 1) this.floor[i] = this.snowTop(x, z);
+    if (flags) this.floor[i] = this.snowTop(x, z) + (flags & 2 ? 0.25 : 0);
     return i;
   },
   // the fresh snow surface (the layer sits on the ground)
@@ -5202,16 +5353,17 @@ const FX = {
   },
   // a snow impact: a ring of heavy chunks thrown out low, and a cloud that rolls outward and hangs
   impact(x, y, z, vx, vz, power, powder) {
-    const nC = Math.round(8 + power * 26), nP = Math.round(6 + power * (14 + powder * 30));
+    const R = Math.random;
+    const nC = Math.round(16 + power * 50), nP = Math.round(18 + power * (40 + powder * 60));
     for (let k = 0; k < nC; k++) {
-      const a = Math.random() * TAU, s = (1.5 + Math.random() * 3.5) * (0.6 + power);
-      this.spawn(x + Math.cos(a) * 0.3, y + 0.1, z + Math.sin(a) * 0.3, vx * 0.45 + Math.cos(a) * s, 1.5 + Math.random() * 3 * (0.5 + power), vz * 0.45 + Math.sin(a) * s,
-        0.7 + Math.random() * 0.7, 0.05 + Math.random() * 0.07, 0.04, 1, 1, 1, 1, 1, 1.4, 0.9, 1, 1);
+      const a = R() * TAU, s = (1.5 + R() * 4) * (0.6 + power);
+      this.chunk(x + Math.cos(a) * 0.3, y + 0.15, z + Math.sin(a) * 0.3, vx * 0.45 + Math.cos(a) * s, 2 + R() * 4 * (0.5 + power), vz * 0.45 + Math.sin(a) * s, 0.06 + R() * 0.1, 0.9 + R() * 0.7);
     }
     for (let k = 0; k < nP; k++) {
-      const a = Math.random() * TAU, s = (0.8 + Math.random() * 2.2) * (0.5 + power);
-      this.spawn(x + Math.cos(a) * 0.5, y + 0.15 + Math.random() * 0.3, z + Math.sin(a) * 0.5, vx * 0.3 + Math.cos(a) * s, 0.4 + Math.random() * (1 + powder * 2), vz * 0.3 + Math.sin(a) * s,
-        1.2 + Math.random() * (1 + powder * 1.4), 0.35 + powder * 0.2, 1.4 + power * 1.2 + powder * 1.6, 0.42 + powder * 0.2, 1, 1, 1, 0.04, 1.6, 0, 1, 0);
+      // a ring of cloud thrown out and up, carried on with the rider's momentum
+      const a = R() * TAU, s = (1 + R() * 3) * (0.5 + power);
+      this.puff(x + Math.cos(a) * 0.5, y + 0.2 + R() * 0.3, z + Math.sin(a) * 0.5, vx * 0.35 + Math.cos(a) * s, 1.5 + R() * (2.5 + powder * 2.5) * (0.5 + power), vz * 0.35 + Math.sin(a) * s,
+        1.2 + powder * 1.4 + power * 1.2 + R() * 0.8, 1.4 + R() * 1.2 + powder, 0.55, 0.45, 1.2);
     }
   },
   update(dt) {
@@ -5224,11 +5376,18 @@ const FX = {
       const dr = Math.exp(-this.drag[i] * dt), i3 = i * 3;
       v[i3] *= dr; v[i3 + 2] *= dr; v[i3 + 1] = v[i3 + 1] * dr - 9.81 * this.grav[i] * dt;
       p[i3] += v[i3] * dt; p[i3 + 1] += v[i3 + 1] * dt; p[i3 + 2] += v[i3 + 2] * dt;
-      if (this.flags[i] & 1 && p[i3 + 1] < this.floor[i] && v[i3 + 1] < 0) {
-        // landed: slide to a stop on the surface and melt into it
-        p[i3 + 1] = this.floor[i]; v[i3 + 1] = 0; v[i3] *= 0.35; v[i3 + 2] *= 0.35;
-        if (this.life[i] > 0.35) { this.life[i] = 0.35; this.max[i] = 0.35 / Math.max(0.05, 1 - t); }
-        this.floor[i] = this.snowTop(p[i3], p[i3 + 2]);
+      const fl = this.flags[i];
+      if (fl && p[i3 + 1] < this.floor[i] && v[i3 + 1] < 0) {
+        p[i3 + 1] = this.floor[i]; v[i3 + 1] = 0;
+        if (fl & 1) {
+          // a chunk landed: slide to a stop on the surface and melt into it
+          v[i3] *= 0.35; v[i3 + 2] *= 0.35;
+          if (this.life[i] > 0.35) { this.life[i] = 0.35; this.max[i] = 0.35 / Math.max(0.05, 1 - t); }
+        } else {
+          // a cloud settling: it rolls out along the snow as it thins
+          v[i3] *= 0.7; v[i3 + 2] *= 0.7; this.grav[i] = 0;
+        }
+        this.floor[i] = this.snowTop(p[i3], p[i3 + 2]) + (fl & 2 ? 0.25 : 0);
       }
       P[i3] = p[i3]; P[i3 + 1] = p[i3 + 1]; P[i3 + 2] = p[i3 + 2];
       S[i] = lerp(this.size0[i], this.size1[i], 1 - (1 - t) * (1 - t));
@@ -5250,19 +5409,28 @@ const FX = {
   // ---- board snow: distance-based, so the amount of snow thrown doesn't depend on frame rate ----
   // Emitters walk the path the board took this frame and drop particles every few centimetres,
   // interpolating position so fast riding leaves a continuous sheet rather than clumps.
+  // a cloud puff: starts small and dense, swells as it rises, arcs over and settles back on the snow
+  puff(x, y, z, vx, vy, vz, size, life, alpha, grav = 0.5, drag = 1.4) {
+    return this.spawn(x, y, z, vx, vy, vz, life, size * 0.3, size, alpha, 1, 1, 1, grav, drag, 0, 1, 2);
+  },
+  // a chunk of snow on a ballistic arc
+  chunk(x, y, z, vx, vy, vz, size, life) {
+    return this.spawn(x, y, z, vx, vy, vz, life, size, size * 0.8, 1, 1, 1, 1, 1, 0.5, 1, 1, 1);
+  },
   boardSpray(dt, pl) {
     const E = this.em;
     const on = pl.ground && !pl.crashed && !pl.grind;
-    if (!on || pl.speed < 1.2) { E.last = null; return; }
+    if (!on || pl.speed < 0.8) { E.last = null; return; }
     const p = pl.pos;
     if (!E.last) { E.last = p.clone(); return; }
     const step = E.last.distanceTo(p);
     if (step > 6) { E.last.copy(p); return; }
     const sp = pl.speed, S = pl.surf;
+    const R = Math.random;
     const powder = S.powder * (1 - S.groom) * (1 - S.road);
-    const fresh = (1 - S.groom * 0.75) * (1 - S.road);
-    const carve = Math.abs(pl.edge) * sstep(4, 14, sp);
-    const skid = clamp(pl.skid * 1.4 + pl.brake * 0.6, 0, 1.2);
+    const fresh = (1 - S.groom * 0.7) * (1 - S.road);
+    const carve = Math.abs(pl.edge) * sstep(3, 12, sp);
+    const skid = clamp(pl.skid * 1.5 + pl.brake * 0.8, 0, 1.3) * sstep(0.8, 4, sp);
     const press = Math.abs(pl.press || 0);
     // board frame
     const f = _v.set(Math.sin(pl.yaw), 0, Math.cos(pl.yaw));
@@ -5272,77 +5440,63 @@ const FX = {
     const ox = lx * turnSide, oz = lz * turnSide;
     const tail = -pl.ride; // the tail is behind along the board
     const fx = f.x, fz = f.z;
-    // per-metre rates
-    const rEdge = carve * (6 + sp * 0.9) * (0.5 + fresh);
-    const rSkid = skid * (10 + sp * 1.6) * (0.6 + fresh * 0.8);
-    const rPlume = powder * (3 + sp * 0.55);
-    const rMist = sstep(9, 24, sp) * (0.6 + fresh) * 1.4;
-    const rButter = press * (pl.butterSpin ? 14 : 4);
-    const emit = (rate, fn, key) => {
-      E[key] = (E[key] || 0) + rate * step;
-      let n = Math.floor(E[key]); E[key] -= n;
-      while (n-- > 0) { const k = Math.random(); fn(E.last.x + (p.x - E.last.x) * k, E.last.y + (p.y - E.last.y) * k, E.last.z + (p.z - E.last.z) * k); }
-    };
-    // carve: a sheet off the tail half of the edge, thrown outward and up
-    emit(rEdge, (x, y, z) => {
-      const along = tail * (0.1 + Math.random() * 0.75);
-      const ex = x + fx * along + ox * 0.14, ez = z + fz * along + oz * 0.14;
-      const out = (1.5 + Math.random() * 2.5) * (0.6 + carve) + sp * 0.12;
-      const up = 1.0 + Math.random() * (1.4 + powder * 2.5) + sp * 0.05;
-      const hard = Math.random() < 0.55 ? 1 : 0;
-      this.spawn(ex, y + 0.05, ez, pl.vel.x * 0.55 + ox * out, up, pl.vel.z * 0.55 + oz * out,
-        hard ? 0.35 + Math.random() * 0.35 : 0.5 + Math.random() * 0.6, hard ? 0.035 + Math.random() * 0.05 : 0.14, hard ? 0.03 : 0.5 + powder * 0.7 + Math.random() * 0.3,
-        hard ? 0.95 : 0.4, 1, 1, 1, hard ? 1 : 0.3, hard ? 1.2 : 2.6, hard, 1, hard);
-    }, 'edgeA');
-    // skid: the whole downhill edge scrapes a wide fan of snow ahead of the board
-    emit(rSkid, (x, y, z) => {
-      const along = (Math.random() - 0.5) * 1.4;
-      const ex = x + fx * along, ez = z + fz * along;
-      const fan = (Math.random() - 0.5) * 1.2;
-      const fwd = sp * (0.55 + Math.random() * 0.3);
-      const vx = dx * fwd + (lx * fan + ox * 0.6) * (1.5 + sp * 0.1), vz = dz * fwd + (lz * fan + oz * 0.6) * (1.5 + sp * 0.1);
-      const hard = Math.random() < 0.6 ? 1 : 0;
-      this.spawn(ex, y + 0.06, ez, vx, 0.8 + Math.random() * (1.6 + powder * 2), vz,
-        hard ? 0.35 + Math.random() * 0.4 : 0.6 + Math.random() * 0.7, hard ? 0.04 + Math.random() * 0.05 : 0.2, hard ? 0.03 : 0.7 + powder + Math.random() * 0.4,
-        hard ? 0.95 : 0.38, 1, 1, 1, hard ? 1 : 0.25, hard ? 1.5 : 2.8, hard, 1, hard);
-    }, 'skidA');
-    // powder: a rooster tail behind the board that hangs in the air and drifts with the wind
     const wind = Sky.weather ? Sky.weather.wind : 0;
-    emit(rPlume, (x, y, z) => {
-      const along = tail * (0.4 + Math.random() * 0.5);
-      const side = (Math.random() - 0.5) * 0.6;
-      const ex = x + fx * along + lx * side, ez = z + fz * along + lz * side;
-      const big = Math.random() < 0.6;
-      if (big) {
-        this.spawn(ex, y + 0.15, ez, pl.vel.x * 0.18 + lx * side * 2 + wind * 0.8, 1.6 + Math.random() * 2.2 + sp * 0.07, pl.vel.z * 0.18 + lz * side * 2,
-          1.6 + Math.random() * 1.6, 0.4, 1.6 + Math.random() * 1.4 + sp * 0.035, 0.27, 1, 1, 1, 0.05, 1.3, 0, 1, 0);
-      } else {
-        // clumps thrown higher that fall back out of the cloud
-        this.spawn(ex, y + 0.12, ez, pl.vel.x * 0.35 + lx * side * 3, 2.5 + Math.random() * 3.5 + sp * 0.08, pl.vel.z * 0.35 + lz * side * 3,
-          0.8 + Math.random() * 0.6, 0.05 + Math.random() * 0.06, 0.04, 0.95, 1, 1, 1, 0.9, 1.0, 1, 1, 1);
-      }
+    // every emitter is "so many per metre" plus "so many per second": steady whatever the frame rate,
+    // spread along the path the board took this frame so fast riding leaves a continuous sheet
+    const emit = (perM, perS, fn, key) => {
+      E[key] = (E[key] || 0) + perM * step + perS * dt;
+      let n = Math.floor(E[key]); E[key] -= n;
+      while (n-- > 0) { const k = R(); fn(E.last.x + (p.x - E.last.x) * k, E.last.y + (p.y - E.last.y) * k, E.last.z + (p.z - E.last.z) * k); }
+    };
+    // carve: a sheet of snow off the tail half of the edge, thrown out of the turn and up, then falling back
+    emit(carve * (9 + sp * 1.3) * (0.5 + fresh), carve * 20, (x, y, z) => {
+      const along = tail * (0.1 + R() * 0.75);
+      const ex = x + fx * along + ox * 0.15, ez = z + fz * along + oz * 0.15;
+      const out = (1.8 + R() * 2.8) * (0.6 + carve) + sp * 0.14;
+      const up = 1.6 + R() * (2.2 + powder * 2.5) + sp * 0.06;
+      if (R() < 0.62) this.puff(ex, y + 0.08, ez, pl.vel.x * 0.5 + ox * out, up, pl.vel.z * 0.5 + oz * out, 0.9 + powder * 1.2 + R() * 0.6, 0.9 + R() * 0.8, 0.5, 0.55, 1.5);
+      else this.chunk(ex, y + 0.06, ez, pl.vel.x * 0.55 + ox * out * 1.2, up * 1.2, pl.vel.z * 0.55 + oz * out * 1.2, 0.05 + R() * 0.08, 0.7 + R() * 0.5);
+    }, 'edgeA');
+    // braking: the whole downhill edge scrapes up a wall of snow and throws it ahead and up in a big
+    // arc; it hangs for a moment, then rains back down and settles
+    emit(skid * (34 + sp * 3.2) * (0.7 + fresh * 0.6), skid * 90, (x, y, z) => {
+      const along = (R() - 0.5) * 1.5;
+      const ex = x + fx * along, ez = z + fz * along;
+      const fan = (R() - 0.5) * 1.4;
+      const fwd = sp * (0.45 + R() * 0.45) + 1.5;
+      const side = (1.2 + sp * 0.12) * (0.5 + R());
+      const vx = dx * fwd + (lx * fan + ox * 0.7) * side, vz = dz * fwd + (lz * fan + oz * 0.7) * side;
+      const up = 2.4 + R() * 3.2 + sp * 0.12 + powder * 2;
+      if (R() < 0.7) this.puff(ex, y + 0.1, ez, vx, up, vz, 1.1 + powder * 1.4 + sp * 0.04 + R() * 1.0, 1.2 + R() * 1.1, 0.6, 0.6, 1.25);
+      else this.chunk(ex, y + 0.08, ez, vx * 1.1, up * 1.15, vz * 1.1, 0.06 + R() * 0.1, 0.9 + R() * 0.6);
+    }, 'skidA');
+    // powder: a rooster tail behind the board that climbs, hangs in the air and drifts down with the wind
+    emit(powder * (7 + sp * 0.9), powder * 10 * sstep(1, 5, sp), (x, y, z) => {
+      const along = tail * (0.4 + R() * 0.5);
+      const sd = (R() - 0.5) * 0.7;
+      const ex = x + fx * along + lx * sd, ez = z + fz * along + lz * sd;
+      if (R() < 0.75) this.puff(ex, y + 0.2, ez, pl.vel.x * 0.22 + lx * sd * 2.5 + wind * 0.8, 2.6 + R() * 2.6 + sp * 0.11, pl.vel.z * 0.22 + lz * sd * 2.5, 1.8 + R() * 1.6 + sp * 0.05, 1.8 + R() * 1.6, 0.42, 0.32, 1.0);
+      else this.chunk(ex, y + 0.15, ez, pl.vel.x * 0.35 + lx * sd * 3, 3 + R() * 3.5 + sp * 0.1, pl.vel.z * 0.35 + lz * sd * 3, 0.06 + R() * 0.07, 0.9 + R() * 0.5);
     }, 'plumeA');
     // bow wave: deep snow piles up and splits around the nose
-    if (powder > 0.3 && sp > 5) emit(powder * 2.5, (x, y, z) => {
-      const nose = pl.ride * 0.75, s = Math.random() < 0.5 ? -1 : 1;
-      this.spawn(x + fx * nose, y + 0.2, z + fz * nose, pl.vel.x * 0.75 + lx * s * (1 + Math.random() * 1.5), 0.6 + Math.random(), pl.vel.z * 0.75 + lz * s * (1 + Math.random() * 1.5),
-        0.5 + Math.random() * 0.4, 0.25, 0.8, 0.35, 1, 1, 1, 0.2, 2.5, 0, 1, 0);
+    if (powder > 0.3 && sp > 5) emit(powder * 4, 0, (x, y, z) => {
+      const nose = pl.ride * 0.75, sd = R() < 0.5 ? -1 : 1;
+      this.puff(x + fx * nose, y + 0.25, z + fz * nose, pl.vel.x * 0.75 + lx * sd * (1.2 + R() * 1.8), 1 + R() * 1.4, pl.vel.z * 0.75 + lz * sd * (1.2 + R() * 1.8), 0.9 + R() * 0.5, 0.6 + R() * 0.4, 0.45, 0.4, 2);
     }, 'bowA');
     // fine mist kicked up at speed, even on hardpack
-    emit(rMist, (x, y, z) => {
-      const along = tail * (0.3 + Math.random() * 0.6);
-      this.spawn(x + fx * along, y + 0.08, z + fz * along, pl.vel.x * 0.35 + (Math.random() - 0.5), 0.3 + Math.random() * 0.6, pl.vel.z * 0.35 + (Math.random() - 0.5),
-        0.7 + Math.random() * 0.5, 0.15, 0.7 + Math.random() * 0.5, 0.16 + powder * 0.1, 1, 1, 1, 0.02, 2.2, 0, 1, 0);
+    emit(sstep(8, 24, sp) * (0.8 + fresh) * 1.6, 0, (x, y, z) => {
+      const along = tail * (0.3 + R() * 0.6);
+      this.spawn(x + fx * along, y + 0.08, z + fz * along, pl.vel.x * 0.35 + (R() - 0.5), 0.4 + R() * 0.7, pl.vel.z * 0.35 + (R() - 0.5),
+        0.8 + R() * 0.6, 0.2, 1.0 + R() * 0.6, 0.2 + powder * 0.12, 1, 1, 1, 0.05, 2.0, 0, 1, 2);
     }, 'mistA');
     // butters: the free end of the board sweeps a smear of snow around the pivot
-    if (rButter > 0) emit(rButter, (x, y, z) => {
+    if (press > 0.1) emit(press * (pl.butterSpin ? 18 : 5), press * (pl.butterSpin ? 40 : 6), (x, y, z) => {
       const end = -pl.press * pl.ride * 0.75;
       const ex = x + fx * end, ez = z + fz * end;
       const sw = pl.butterSpin || 0;
       const vx = -fz * sw * 2.5 * Math.sign(end) + pl.vel.x * 0.4, vz = fx * sw * 2.5 * Math.sign(end) + pl.vel.z * 0.4;
-      const hard = Math.random() < 0.5 ? 1 : 0;
-      this.spawn(ex, y + 0.06, ez, vx + (Math.random() - 0.5), 0.7 + Math.random() * 1.2, vz + (Math.random() - 0.5),
-        0.4 + Math.random() * 0.4, hard ? 0.04 : 0.15, hard ? 0.03 : 0.6, hard ? 0.9 : 0.35, 1, 1, 1, hard ? 1 : 0.3, 2, hard, 1, hard);
+      if (R() < 0.6) this.puff(ex, y + 0.08, ez, vx + (R() - 0.5), 1.2 + R() * 1.6, vz + (R() - 0.5), 0.7 + R() * 0.5, 0.7 + R() * 0.5, 0.5, 0.55, 1.6);
+      else this.chunk(ex, y + 0.06, ez, vx, 1.4 + R() * 1.6, vz, 0.05 + R() * 0.06, 0.6 + R() * 0.4);
     }, 'butterA');
     E.last.copy(p);
   },
@@ -5409,8 +5563,10 @@ const FX = {
     const ang = Math.atan2(lz, lx);
     const i = this.tHead;
     const o = i * 6, d = i * 8;
-    this.tPos[o] = x + lx * hw; this.tPos[o + 1] = y; this.tPos[o + 2] = z + lz * hw;
-    this.tPos[o + 3] = x - lx * hw; this.tPos[o + 4] = y; this.tPos[o + 5] = z - lz * hw;
+    // each edge sits on the ground under it, so the ribbon follows banks and gully walls
+    const off = y - World.groundHeight(x, z);
+    this.tPos[o] = x + lx * hw; this.tPos[o + 1] = World.groundHeight(x + lx * hw, z + lz * hw) + off; this.tPos[o + 2] = z + lz * hw;
+    this.tPos[o + 3] = x - lx * hw; this.tPos[o + 4] = World.groundHeight(x - lx * hw, z - lz * hw) + off; this.tPos[o + 5] = z - lz * hw;
     this.tData.set([1, strength, depth, ang, -1, strength, depth, ang], d);
     this.tHead = (this.tHead + 1) % this.TN;
     // the quad that would join the newest and oldest pair across the ring wrap is hidden
@@ -5623,7 +5779,7 @@ const Snow = {
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const px = x0 + (i + 0.5) * t - x, pz = z0 + (j + 0.5) * t - z;
       const u = Math.abs(px * ax + pz * az), v = Math.abs(-px * az + pz * ax);
-      const soft = t * 2.5;
+      const soft = t * 4.5;
       if (u > halfLen + soft || v > halfWid + soft) continue;
       // soft edges and rounded nose and tail, so the groove walls slump like real snow
       const ru = Math.max(0, u - (halfLen - halfWid));

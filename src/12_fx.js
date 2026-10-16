@@ -6,7 +6,7 @@
 // eroded by a tiling noise texture so no two look alike. "Hard" particles are
 // crisp chunks of snow that catch the sun; soft ones are drifting powder.
 const FX = {
-  N: 12000, cursor: 0, _lc: new THREE.Color(),
+  N: 22000, cursor: 0, _lc: new THREE.Color(),
   init(scene) {
     const N = this.N;
     this.p = new Float32Array(N * 3); this.v = new Float32Array(N * 3);
@@ -52,7 +52,7 @@ const FX = {
           vec4 nz = texture2D(uNoise, rc * 0.32 + vec2(seed * 7.13, seed * 3.71));
           float n = nz.r * 0.6 + nz.g * 0.4;
           // soft: a cauliflower puff eroded by noise; hard: a chunk with a ragged edge
-          float soft = clamp((1.0 - r2) * 1.5 - (1.0 - n) * 0.95, 0.0, 1.0); soft = soft * soft * (3.0 - 2.0 * soft);
+          float soft = clamp((1.0 - r2) * 1.9 - (1.0 - n) * 0.8, 0.0, 1.0); soft = soft * soft * (3.0 - 2.0 * soft);
           float chunk = smoothstep(0.0, 0.22, 1.0 - sqrt(r2) - (nz.b - 0.5) * 0.55);
           float alpha = mix(soft, chunk, hard) * vA;
           if (alpha < 0.004) discard;
@@ -114,7 +114,7 @@ const FX = {
     C[i * 3] = r; C[i * 3 + 1] = g; C[i * 3 + 2] = b;
     M[i * 3] = Math.random(); M[i * 3 + 1] = hard; M[i * 3 + 2] = lit;
     this.grav[i] = grav; this.drag[i] = drag; this.flags[i] = flags;
-    if (flags & 1) this.floor[i] = this.snowTop(x, z);
+    if (flags) this.floor[i] = this.snowTop(x, z) + (flags & 2 ? 0.25 : 0);
     return i;
   },
   // the fresh snow surface (the layer sits on the ground)
@@ -132,16 +132,17 @@ const FX = {
   },
   // a snow impact: a ring of heavy chunks thrown out low, and a cloud that rolls outward and hangs
   impact(x, y, z, vx, vz, power, powder) {
-    const nC = Math.round(8 + power * 26), nP = Math.round(6 + power * (14 + powder * 30));
+    const R = Math.random;
+    const nC = Math.round(16 + power * 50), nP = Math.round(18 + power * (40 + powder * 60));
     for (let k = 0; k < nC; k++) {
-      const a = Math.random() * TAU, s = (1.5 + Math.random() * 3.5) * (0.6 + power);
-      this.spawn(x + Math.cos(a) * 0.3, y + 0.1, z + Math.sin(a) * 0.3, vx * 0.45 + Math.cos(a) * s, 1.5 + Math.random() * 3 * (0.5 + power), vz * 0.45 + Math.sin(a) * s,
-        0.7 + Math.random() * 0.7, 0.05 + Math.random() * 0.07, 0.04, 1, 1, 1, 1, 1, 1.4, 0.9, 1, 1);
+      const a = R() * TAU, s = (1.5 + R() * 4) * (0.6 + power);
+      this.chunk(x + Math.cos(a) * 0.3, y + 0.15, z + Math.sin(a) * 0.3, vx * 0.45 + Math.cos(a) * s, 2 + R() * 4 * (0.5 + power), vz * 0.45 + Math.sin(a) * s, 0.06 + R() * 0.1, 0.9 + R() * 0.7);
     }
     for (let k = 0; k < nP; k++) {
-      const a = Math.random() * TAU, s = (0.8 + Math.random() * 2.2) * (0.5 + power);
-      this.spawn(x + Math.cos(a) * 0.5, y + 0.15 + Math.random() * 0.3, z + Math.sin(a) * 0.5, vx * 0.3 + Math.cos(a) * s, 0.4 + Math.random() * (1 + powder * 2), vz * 0.3 + Math.sin(a) * s,
-        1.2 + Math.random() * (1 + powder * 1.4), 0.35 + powder * 0.2, 1.4 + power * 1.2 + powder * 1.6, 0.42 + powder * 0.2, 1, 1, 1, 0.04, 1.6, 0, 1, 0);
+      // a ring of cloud thrown out and up, carried on with the rider's momentum
+      const a = R() * TAU, s = (1 + R() * 3) * (0.5 + power);
+      this.puff(x + Math.cos(a) * 0.5, y + 0.2 + R() * 0.3, z + Math.sin(a) * 0.5, vx * 0.35 + Math.cos(a) * s, 1.5 + R() * (2.5 + powder * 2.5) * (0.5 + power), vz * 0.35 + Math.sin(a) * s,
+        1.2 + powder * 1.4 + power * 1.2 + R() * 0.8, 1.4 + R() * 1.2 + powder, 0.55, 0.45, 1.2);
     }
   },
   update(dt) {
@@ -154,11 +155,18 @@ const FX = {
       const dr = Math.exp(-this.drag[i] * dt), i3 = i * 3;
       v[i3] *= dr; v[i3 + 2] *= dr; v[i3 + 1] = v[i3 + 1] * dr - 9.81 * this.grav[i] * dt;
       p[i3] += v[i3] * dt; p[i3 + 1] += v[i3 + 1] * dt; p[i3 + 2] += v[i3 + 2] * dt;
-      if (this.flags[i] & 1 && p[i3 + 1] < this.floor[i] && v[i3 + 1] < 0) {
-        // landed: slide to a stop on the surface and melt into it
-        p[i3 + 1] = this.floor[i]; v[i3 + 1] = 0; v[i3] *= 0.35; v[i3 + 2] *= 0.35;
-        if (this.life[i] > 0.35) { this.life[i] = 0.35; this.max[i] = 0.35 / Math.max(0.05, 1 - t); }
-        this.floor[i] = this.snowTop(p[i3], p[i3 + 2]);
+      const fl = this.flags[i];
+      if (fl && p[i3 + 1] < this.floor[i] && v[i3 + 1] < 0) {
+        p[i3 + 1] = this.floor[i]; v[i3 + 1] = 0;
+        if (fl & 1) {
+          // a chunk landed: slide to a stop on the surface and melt into it
+          v[i3] *= 0.35; v[i3 + 2] *= 0.35;
+          if (this.life[i] > 0.35) { this.life[i] = 0.35; this.max[i] = 0.35 / Math.max(0.05, 1 - t); }
+        } else {
+          // a cloud settling: it rolls out along the snow as it thins
+          v[i3] *= 0.7; v[i3 + 2] *= 0.7; this.grav[i] = 0;
+        }
+        this.floor[i] = this.snowTop(p[i3], p[i3 + 2]) + (fl & 2 ? 0.25 : 0);
       }
       P[i3] = p[i3]; P[i3 + 1] = p[i3 + 1]; P[i3 + 2] = p[i3 + 2];
       S[i] = lerp(this.size0[i], this.size1[i], 1 - (1 - t) * (1 - t));
@@ -180,19 +188,28 @@ const FX = {
   // ---- board snow: distance-based, so the amount of snow thrown doesn't depend on frame rate ----
   // Emitters walk the path the board took this frame and drop particles every few centimetres,
   // interpolating position so fast riding leaves a continuous sheet rather than clumps.
+  // a cloud puff: starts small and dense, swells as it rises, arcs over and settles back on the snow
+  puff(x, y, z, vx, vy, vz, size, life, alpha, grav = 0.5, drag = 1.4) {
+    return this.spawn(x, y, z, vx, vy, vz, life, size * 0.3, size, alpha, 1, 1, 1, grav, drag, 0, 1, 2);
+  },
+  // a chunk of snow on a ballistic arc
+  chunk(x, y, z, vx, vy, vz, size, life) {
+    return this.spawn(x, y, z, vx, vy, vz, life, size, size * 0.8, 1, 1, 1, 1, 1, 0.5, 1, 1, 1);
+  },
   boardSpray(dt, pl) {
     const E = this.em;
     const on = pl.ground && !pl.crashed && !pl.grind;
-    if (!on || pl.speed < 1.2) { E.last = null; return; }
+    if (!on || pl.speed < 0.8) { E.last = null; return; }
     const p = pl.pos;
     if (!E.last) { E.last = p.clone(); return; }
     const step = E.last.distanceTo(p);
     if (step > 6) { E.last.copy(p); return; }
     const sp = pl.speed, S = pl.surf;
+    const R = Math.random;
     const powder = S.powder * (1 - S.groom) * (1 - S.road);
-    const fresh = (1 - S.groom * 0.75) * (1 - S.road);
-    const carve = Math.abs(pl.edge) * sstep(4, 14, sp);
-    const skid = clamp(pl.skid * 1.4 + pl.brake * 0.6, 0, 1.2);
+    const fresh = (1 - S.groom * 0.7) * (1 - S.road);
+    const carve = Math.abs(pl.edge) * sstep(3, 12, sp);
+    const skid = clamp(pl.skid * 1.5 + pl.brake * 0.8, 0, 1.3) * sstep(0.8, 4, sp);
     const press = Math.abs(pl.press || 0);
     // board frame
     const f = _v.set(Math.sin(pl.yaw), 0, Math.cos(pl.yaw));
@@ -202,77 +219,63 @@ const FX = {
     const ox = lx * turnSide, oz = lz * turnSide;
     const tail = -pl.ride; // the tail is behind along the board
     const fx = f.x, fz = f.z;
-    // per-metre rates
-    const rEdge = carve * (6 + sp * 0.9) * (0.5 + fresh);
-    const rSkid = skid * (10 + sp * 1.6) * (0.6 + fresh * 0.8);
-    const rPlume = powder * (3 + sp * 0.55);
-    const rMist = sstep(9, 24, sp) * (0.6 + fresh) * 1.4;
-    const rButter = press * (pl.butterSpin ? 14 : 4);
-    const emit = (rate, fn, key) => {
-      E[key] = (E[key] || 0) + rate * step;
-      let n = Math.floor(E[key]); E[key] -= n;
-      while (n-- > 0) { const k = Math.random(); fn(E.last.x + (p.x - E.last.x) * k, E.last.y + (p.y - E.last.y) * k, E.last.z + (p.z - E.last.z) * k); }
-    };
-    // carve: a sheet off the tail half of the edge, thrown outward and up
-    emit(rEdge, (x, y, z) => {
-      const along = tail * (0.1 + Math.random() * 0.75);
-      const ex = x + fx * along + ox * 0.14, ez = z + fz * along + oz * 0.14;
-      const out = (1.5 + Math.random() * 2.5) * (0.6 + carve) + sp * 0.12;
-      const up = 1.0 + Math.random() * (1.4 + powder * 2.5) + sp * 0.05;
-      const hard = Math.random() < 0.55 ? 1 : 0;
-      this.spawn(ex, y + 0.05, ez, pl.vel.x * 0.55 + ox * out, up, pl.vel.z * 0.55 + oz * out,
-        hard ? 0.35 + Math.random() * 0.35 : 0.5 + Math.random() * 0.6, hard ? 0.035 + Math.random() * 0.05 : 0.14, hard ? 0.03 : 0.5 + powder * 0.7 + Math.random() * 0.3,
-        hard ? 0.95 : 0.4, 1, 1, 1, hard ? 1 : 0.3, hard ? 1.2 : 2.6, hard, 1, hard);
-    }, 'edgeA');
-    // skid: the whole downhill edge scrapes a wide fan of snow ahead of the board
-    emit(rSkid, (x, y, z) => {
-      const along = (Math.random() - 0.5) * 1.4;
-      const ex = x + fx * along, ez = z + fz * along;
-      const fan = (Math.random() - 0.5) * 1.2;
-      const fwd = sp * (0.55 + Math.random() * 0.3);
-      const vx = dx * fwd + (lx * fan + ox * 0.6) * (1.5 + sp * 0.1), vz = dz * fwd + (lz * fan + oz * 0.6) * (1.5 + sp * 0.1);
-      const hard = Math.random() < 0.6 ? 1 : 0;
-      this.spawn(ex, y + 0.06, ez, vx, 0.8 + Math.random() * (1.6 + powder * 2), vz,
-        hard ? 0.35 + Math.random() * 0.4 : 0.6 + Math.random() * 0.7, hard ? 0.04 + Math.random() * 0.05 : 0.2, hard ? 0.03 : 0.7 + powder + Math.random() * 0.4,
-        hard ? 0.95 : 0.38, 1, 1, 1, hard ? 1 : 0.25, hard ? 1.5 : 2.8, hard, 1, hard);
-    }, 'skidA');
-    // powder: a rooster tail behind the board that hangs in the air and drifts with the wind
     const wind = Sky.weather ? Sky.weather.wind : 0;
-    emit(rPlume, (x, y, z) => {
-      const along = tail * (0.4 + Math.random() * 0.5);
-      const side = (Math.random() - 0.5) * 0.6;
-      const ex = x + fx * along + lx * side, ez = z + fz * along + lz * side;
-      const big = Math.random() < 0.6;
-      if (big) {
-        this.spawn(ex, y + 0.15, ez, pl.vel.x * 0.18 + lx * side * 2 + wind * 0.8, 1.6 + Math.random() * 2.2 + sp * 0.07, pl.vel.z * 0.18 + lz * side * 2,
-          1.6 + Math.random() * 1.6, 0.4, 1.6 + Math.random() * 1.4 + sp * 0.035, 0.27, 1, 1, 1, 0.05, 1.3, 0, 1, 0);
-      } else {
-        // clumps thrown higher that fall back out of the cloud
-        this.spawn(ex, y + 0.12, ez, pl.vel.x * 0.35 + lx * side * 3, 2.5 + Math.random() * 3.5 + sp * 0.08, pl.vel.z * 0.35 + lz * side * 3,
-          0.8 + Math.random() * 0.6, 0.05 + Math.random() * 0.06, 0.04, 0.95, 1, 1, 1, 0.9, 1.0, 1, 1, 1);
-      }
+    // every emitter is "so many per metre" plus "so many per second": steady whatever the frame rate,
+    // spread along the path the board took this frame so fast riding leaves a continuous sheet
+    const emit = (perM, perS, fn, key) => {
+      E[key] = (E[key] || 0) + perM * step + perS * dt;
+      let n = Math.floor(E[key]); E[key] -= n;
+      while (n-- > 0) { const k = R(); fn(E.last.x + (p.x - E.last.x) * k, E.last.y + (p.y - E.last.y) * k, E.last.z + (p.z - E.last.z) * k); }
+    };
+    // carve: a sheet of snow off the tail half of the edge, thrown out of the turn and up, then falling back
+    emit(carve * (9 + sp * 1.3) * (0.5 + fresh), carve * 20, (x, y, z) => {
+      const along = tail * (0.1 + R() * 0.75);
+      const ex = x + fx * along + ox * 0.15, ez = z + fz * along + oz * 0.15;
+      const out = (1.8 + R() * 2.8) * (0.6 + carve) + sp * 0.14;
+      const up = 1.6 + R() * (2.2 + powder * 2.5) + sp * 0.06;
+      if (R() < 0.62) this.puff(ex, y + 0.08, ez, pl.vel.x * 0.5 + ox * out, up, pl.vel.z * 0.5 + oz * out, 0.9 + powder * 1.2 + R() * 0.6, 0.9 + R() * 0.8, 0.5, 0.55, 1.5);
+      else this.chunk(ex, y + 0.06, ez, pl.vel.x * 0.55 + ox * out * 1.2, up * 1.2, pl.vel.z * 0.55 + oz * out * 1.2, 0.05 + R() * 0.08, 0.7 + R() * 0.5);
+    }, 'edgeA');
+    // braking: the whole downhill edge scrapes up a wall of snow and throws it ahead and up in a big
+    // arc; it hangs for a moment, then rains back down and settles
+    emit(skid * (34 + sp * 3.2) * (0.7 + fresh * 0.6), skid * 90, (x, y, z) => {
+      const along = (R() - 0.5) * 1.5;
+      const ex = x + fx * along, ez = z + fz * along;
+      const fan = (R() - 0.5) * 1.4;
+      const fwd = sp * (0.45 + R() * 0.45) + 1.5;
+      const side = (1.2 + sp * 0.12) * (0.5 + R());
+      const vx = dx * fwd + (lx * fan + ox * 0.7) * side, vz = dz * fwd + (lz * fan + oz * 0.7) * side;
+      const up = 2.4 + R() * 3.2 + sp * 0.12 + powder * 2;
+      if (R() < 0.7) this.puff(ex, y + 0.1, ez, vx, up, vz, 1.1 + powder * 1.4 + sp * 0.04 + R() * 1.0, 1.2 + R() * 1.1, 0.6, 0.6, 1.25);
+      else this.chunk(ex, y + 0.08, ez, vx * 1.1, up * 1.15, vz * 1.1, 0.06 + R() * 0.1, 0.9 + R() * 0.6);
+    }, 'skidA');
+    // powder: a rooster tail behind the board that climbs, hangs in the air and drifts down with the wind
+    emit(powder * (7 + sp * 0.9), powder * 10 * sstep(1, 5, sp), (x, y, z) => {
+      const along = tail * (0.4 + R() * 0.5);
+      const sd = (R() - 0.5) * 0.7;
+      const ex = x + fx * along + lx * sd, ez = z + fz * along + lz * sd;
+      if (R() < 0.75) this.puff(ex, y + 0.2, ez, pl.vel.x * 0.22 + lx * sd * 2.5 + wind * 0.8, 2.6 + R() * 2.6 + sp * 0.11, pl.vel.z * 0.22 + lz * sd * 2.5, 1.8 + R() * 1.6 + sp * 0.05, 1.8 + R() * 1.6, 0.42, 0.32, 1.0);
+      else this.chunk(ex, y + 0.15, ez, pl.vel.x * 0.35 + lx * sd * 3, 3 + R() * 3.5 + sp * 0.1, pl.vel.z * 0.35 + lz * sd * 3, 0.06 + R() * 0.07, 0.9 + R() * 0.5);
     }, 'plumeA');
     // bow wave: deep snow piles up and splits around the nose
-    if (powder > 0.3 && sp > 5) emit(powder * 2.5, (x, y, z) => {
-      const nose = pl.ride * 0.75, s = Math.random() < 0.5 ? -1 : 1;
-      this.spawn(x + fx * nose, y + 0.2, z + fz * nose, pl.vel.x * 0.75 + lx * s * (1 + Math.random() * 1.5), 0.6 + Math.random(), pl.vel.z * 0.75 + lz * s * (1 + Math.random() * 1.5),
-        0.5 + Math.random() * 0.4, 0.25, 0.8, 0.35, 1, 1, 1, 0.2, 2.5, 0, 1, 0);
+    if (powder > 0.3 && sp > 5) emit(powder * 4, 0, (x, y, z) => {
+      const nose = pl.ride * 0.75, sd = R() < 0.5 ? -1 : 1;
+      this.puff(x + fx * nose, y + 0.25, z + fz * nose, pl.vel.x * 0.75 + lx * sd * (1.2 + R() * 1.8), 1 + R() * 1.4, pl.vel.z * 0.75 + lz * sd * (1.2 + R() * 1.8), 0.9 + R() * 0.5, 0.6 + R() * 0.4, 0.45, 0.4, 2);
     }, 'bowA');
     // fine mist kicked up at speed, even on hardpack
-    emit(rMist, (x, y, z) => {
-      const along = tail * (0.3 + Math.random() * 0.6);
-      this.spawn(x + fx * along, y + 0.08, z + fz * along, pl.vel.x * 0.35 + (Math.random() - 0.5), 0.3 + Math.random() * 0.6, pl.vel.z * 0.35 + (Math.random() - 0.5),
-        0.7 + Math.random() * 0.5, 0.15, 0.7 + Math.random() * 0.5, 0.16 + powder * 0.1, 1, 1, 1, 0.02, 2.2, 0, 1, 0);
+    emit(sstep(8, 24, sp) * (0.8 + fresh) * 1.6, 0, (x, y, z) => {
+      const along = tail * (0.3 + R() * 0.6);
+      this.spawn(x + fx * along, y + 0.08, z + fz * along, pl.vel.x * 0.35 + (R() - 0.5), 0.4 + R() * 0.7, pl.vel.z * 0.35 + (R() - 0.5),
+        0.8 + R() * 0.6, 0.2, 1.0 + R() * 0.6, 0.2 + powder * 0.12, 1, 1, 1, 0.05, 2.0, 0, 1, 2);
     }, 'mistA');
     // butters: the free end of the board sweeps a smear of snow around the pivot
-    if (rButter > 0) emit(rButter, (x, y, z) => {
+    if (press > 0.1) emit(press * (pl.butterSpin ? 18 : 5), press * (pl.butterSpin ? 40 : 6), (x, y, z) => {
       const end = -pl.press * pl.ride * 0.75;
       const ex = x + fx * end, ez = z + fz * end;
       const sw = pl.butterSpin || 0;
       const vx = -fz * sw * 2.5 * Math.sign(end) + pl.vel.x * 0.4, vz = fx * sw * 2.5 * Math.sign(end) + pl.vel.z * 0.4;
-      const hard = Math.random() < 0.5 ? 1 : 0;
-      this.spawn(ex, y + 0.06, ez, vx + (Math.random() - 0.5), 0.7 + Math.random() * 1.2, vz + (Math.random() - 0.5),
-        0.4 + Math.random() * 0.4, hard ? 0.04 : 0.15, hard ? 0.03 : 0.6, hard ? 0.9 : 0.35, 1, 1, 1, hard ? 1 : 0.3, 2, hard, 1, hard);
+      if (R() < 0.6) this.puff(ex, y + 0.08, ez, vx + (R() - 0.5), 1.2 + R() * 1.6, vz + (R() - 0.5), 0.7 + R() * 0.5, 0.7 + R() * 0.5, 0.5, 0.55, 1.6);
+      else this.chunk(ex, y + 0.06, ez, vx, 1.4 + R() * 1.6, vz, 0.05 + R() * 0.06, 0.6 + R() * 0.4);
     }, 'butterA');
     E.last.copy(p);
   },
@@ -339,8 +342,10 @@ const FX = {
     const ang = Math.atan2(lz, lx);
     const i = this.tHead;
     const o = i * 6, d = i * 8;
-    this.tPos[o] = x + lx * hw; this.tPos[o + 1] = y; this.tPos[o + 2] = z + lz * hw;
-    this.tPos[o + 3] = x - lx * hw; this.tPos[o + 4] = y; this.tPos[o + 5] = z - lz * hw;
+    // each edge sits on the ground under it, so the ribbon follows banks and gully walls
+    const off = y - World.groundHeight(x, z);
+    this.tPos[o] = x + lx * hw; this.tPos[o + 1] = World.groundHeight(x + lx * hw, z + lz * hw) + off; this.tPos[o + 2] = z + lz * hw;
+    this.tPos[o + 3] = x - lx * hw; this.tPos[o + 4] = World.groundHeight(x - lx * hw, z - lz * hw) + off; this.tPos[o + 5] = z - lz * hw;
     this.tData.set([1, strength, depth, ang, -1, strength, depth, ang], d);
     this.tHead = (this.tHead + 1) % this.TN;
     // the quad that would join the newest and oldest pair across the ring wrap is hidden

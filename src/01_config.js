@@ -41,6 +41,8 @@ const LIFTS = [
   { id: 'peak',     name: 'Peak Pair Lift',    type: 'pair',    a: [-60, -300],  b: [70, -690],    unlock: 5, color: 0x6b4f9a },
   { id: 'east',     name: 'East Ridge Quad',   type: 'quad',    a: [880, 620],   b: [470, -260],   unlock: 6, color: 0x2b7f86 },
   { id: 'summit',   name: 'Summit T-Bar',      type: 'tbar',    a: [60, -700],   b: [100, -905],   unlock: 7, color: 0x8a6d3b },
+  // the back side: a quad up the north face from its own little base
+  { id: 'kita',     name: 'Kita Back Quad',    type: 'quad',    a: [273, -1425], b: [122, -1027], unlock: 4, color: 0x7a3f8f },
 ];
 
 // Feature positions use t = fraction of run length.
@@ -50,6 +52,12 @@ const RUNS = [
     blurb: 'Wide and mellow beside the village. Everyone starts here.',
     pts: [[-805, 870], [-770, 930], [-800, 990], [-850, 1048]],
     features: [
+      { k: 'log', t: 0.42, len: 12, lat: -11, h: 0.5 },
+      { k: 'rail', t: 0.76, len: 20, lat: 0, h: 0.8 },
+      { k: 'sidehits', t0: 0.15, t1: 0.5, gap: 40, h: 1.1 },
+      { k: 'kicker', t: 0.82, size: 0, lat: 6 },
+      { k: 'sidehits', t0: 0.15, t1: 0.9, gap: 34, h: 0.9 },
+      { k: 'log', t: 0.35, len: 7, lat: -16, ang: 0.25 },
       { k: 'kicker', t: 0.6, size: 0, lat: 8 },
       { k: 'forest', t0: 0, t1: 1, d: 0.3 },
       { k: 'lamps', t0: 0, t1: 1, gap: 50 },
@@ -71,6 +79,8 @@ const RUNS = [
     blurb: 'Banked turns, rollers and two booters straight back to the village.',
     pts: [[-288, 302], [-222, 430], [-240, 580], [-300, 720], [-362, 860], [-445, 990]],
     features: [
+      { k: 'halfpipe', t0: 0.52, t1: 0.68, h: 2.6 },
+      { k: 'sidehits', t0: 0.82, t1: 0.98, gap: 36, h: 1.3 },
       { k: 'forest', t0: 0, t1: 1, d: 0.9 },
       { k: 'rollers', t0: 0.12, t1: 0.35, amp: 1.2, wl: 30 },
       { k: 'kicker', t: 0.45, size: 1, lat: -4 },
@@ -83,6 +93,10 @@ const RUNS = [
     blurb: 'The long way home: a cat track along the ravine rim with views over the valley.',
     pts: [[-142, -222], [-262, -178], [-392, -82], [-470, 80], [-560, 250], [-622, 430], [-682, 620], [-662, 800], [-602, 942]],
     features: [
+      { k: 'log', t: 0.3, len: 9, lat: 9, ang: -0.2 },
+      { k: 'log', t: 0.42, len: 8, lat: -9, ang: 0.3 },
+      { k: 'rollers', t0: 0.15, t1: 0.25, amp: 0.8, wl: 26 },
+      { k: 'sidehits', t0: 0.6, t1: 0.9, gap: 45, h: 1.2 },
       { k: 'forest', t0: 0, t1: 0.25, d: 0.4 },
       { k: 'forest', t0: 0.25, t1: 1, d: 0.85 },
       { k: 'guns', t0: 0.6, t1: 0.95, gap: 70 },
@@ -94,6 +108,8 @@ const RUNS = [
     blurb: 'Fast, rolling groomer from the gondola through the birch forest.',
     pts: [[-112, -218], [-152, -62], [-118, 120], [-160, 282], [-176, 412]],
     features: [
+      { k: 'sidehits', t0: 0.05, t1: 0.25, gap: 36, h: 1.4 },
+      { k: 'kicker', t: 0.88, size: 0, lat: -7 },
       { k: 'forest', t0: 0, t1: 1, d: 0.9 },
       { k: 'rollers', t0: 0.25, t1: 0.6, amp: 1.4, wl: 36 },
       { k: 'kicker', t: 0.7, size: 1, lat: 0 },
@@ -123,6 +139,9 @@ const RUNS = [
     blurb: 'The big wide groomer down the middle of the mountain. Let it run.',
     pts: [[105, -410], [80, -250], [30, -80], [-20, 100], [-90, 262], [-158, 416]],
     features: [
+      { k: 'rollers', t0: 0.15, t1: 0.32, amp: 1.3, wl: 34 },
+      { k: 'kicker', t: 0.4, size: 1, lat: -8 },
+      { k: 'sidehits', t0: 0.62, t1: 0.95, gap: 42, h: 1.6 },
       { k: 'forest', t0: 0, t1: 1, d: 0.75 },
       { k: 'kicker', t: 0.55, size: 2, lat: 6 },
       { k: 'lamps', t0: 0.6, t1: 1, gap: 55 },
@@ -133,6 +152,10 @@ const RUNS = [
     blurb: 'Open birch stands and soft snow. Pick a line and keep your eyes up.',
     pts: [[140, -405], [160, -250], [130, -60], [80, 120], [-10, 300], [-140, 428]],
     features: [
+      { k: 'pillows', t0: 0.15, t1: 0.75, d: 0.3 },
+      { k: 'log', t: 0.3, len: 9, lat: 8, ang: 0.4 },
+      { k: 'log', t: 0.58, len: 10, lat: -10, ang: -0.35 },
+      { k: 'drop', t: 0.82, h: 2 },
       { k: 'forest', t0: 0, t1: 1, d: 0.9 },
       { k: 'glade', t0: 0.1, t1: 0.9, d: 0.5 },
       { k: 'powder', t0: 0, t1: 1 },
@@ -144,6 +167,7 @@ const RUNS = [
     blurb: 'Steep fall-line moguls right under the pair lift.',
     pts: [[52, -676], [22, -560], [-18, -440], [-52, -318]],
     features: [
+      { k: 'drop', t: 0.93, h: 2 },
       { k: 'forest', t0: 0, t1: 1, d: 0.35 },
       { k: 'moguls', t0: 0.1, t1: 0.9, amp: 0.9 },
     ],
@@ -153,6 +177,9 @@ const RUNS = [
     blurb: 'Rides the east spur from treeline to the east base. Big views the whole way.',
     pts: [[82, -676], [240, -640], [400, -560], [560, -450], [700, -300], [800, -80], [860, 150], [900, 380], [886, 598]],
     features: [
+      { k: 'sidehits', t0: 0.05, t1: 0.4, gap: 48, h: 1.6 },
+      { k: 'kicker', t: 0.35, size: 1, lat: 4 },
+      { k: 'rollers', t0: 0.88, t1: 0.97, amp: 1.0, wl: 30 },
       { k: 'forest', t0: 0, t1: 0.3, d: 0.1 },
       { k: 'forest', t0: 0.3, t1: 1, d: 0.7 },
       { k: 'rollers', t0: 0.45, t1: 0.6, amp: 1.5, wl: 40 },
@@ -164,6 +191,7 @@ const RUNS = [
     blurb: 'Drop the cornice off the summit into the open cone. Deep, wind-blown and committing.',
     pts: [[88, -888], [10, -850], [-80, -760], [-150, -620], [-170, -470], [-122, -332], [-76, -306]],
     features: [
+      { k: 'pillows', t0: 0.55, t1: 0.95, d: 0.3, h: 1.2 },
       { k: 'forest', t0: 0, t1: 0.7, d: 0.0 },
       { k: 'forest', t0: 0.7, t1: 1, d: 0.3 },
       { k: 'powder', t0: 0, t1: 1 },
@@ -177,6 +205,8 @@ const RUNS = [
     blurb: 'A rock-walled chute off the summit that opens into a fall-line rip.',
     pts: [[112, -890], [175, -815], [215, -690], [232, -550], [242, -400], [252, -200], [230, 0], [170, 200], [60, 360], [-118, 446]],
     features: [
+      { k: 'halfpipe', t0: 0.32, t1: 0.52, h: 3.2 },
+      { k: 'pillows', t0: 0.7, t1: 0.9, d: 0.25 },
       { k: 'forest', t0: 0, t1: 0.3, d: 0.0 },
       { k: 'forest', t0: 0.3, t1: 1, d: 0.85 },
       { k: 'rocks', t0: 0.03, t1: 0.22, n: 8 },
@@ -190,6 +220,9 @@ const RUNS = [
     blurb: 'The east side stash. Deep, untracked and full of pillows.',
     pts: [[470, -238], [470, -60], [520, 120], [610, 300], [720, 460], [860, 606]],
     features: [
+      { k: 'pillows', t0: 0.1, t1: 0.8, d: 0.4, h: 1.2 },
+      { k: 'log', t: 0.25, len: 10, lat: 10, ang: 0.3 },
+      { k: 'log', t: 0.62, len: 9, lat: -12, ang: -0.4 },
       { k: 'forest', t0: 0, t1: 1, d: 0.7 },
       { k: 'powder', t0: 0, t1: 1 },
       { k: 'glade', t0: 0.1, t1: 0.9, d: 0.3 },
@@ -198,6 +231,45 @@ const RUNS = [
     ],
   },
 ];
+// ---- the back side: three ways down the north face, two of them crossing the traverse ----
+RUNS.push(
+  {
+    id: 'urabowl', name: 'Ura Bowl', diff: 'black', lift: 'kita', w: 36, groomed: false, bank: 0.2,
+    blurb: 'The back bowl: steep, wind-loaded and full of pillows, with the traverse cutting across it twice.',
+    pts: [[103, -1025], [69, -1097], [92, -1170], [17, -1238], [73, -1329], [147, -1398], [256, -1430]],
+    features: [
+      { k: 'forest', t0: 0, t1: 0.55, d: 0.05 },
+      { k: 'forest', t0: 0.55, t1: 1, d: 0.5 },
+      { k: 'powder', t0: 0, t1: 1 },
+      { k: 'pillows', t0: 0.2, t1: 0.85, d: 0.38, h: 1.3 },
+      { k: 'rocks', t0: 0.1, t1: 0.6, n: 9 },
+      { k: 'drop', t: 0.42, h: 3 },
+    ],
+  },
+  {
+    id: 'kitatraverse', name: 'Kita Traverse', diff: 'green', lift: 'kita', w: 12, groomed: true, bank: 1.1, cattrack: true,
+    blurb: 'A cat track that switchbacks right across the back side, over the bowl and the gully and back again.',
+    pts: [[116, -1026], [73, -1041], [-8, -1045], [-72, -1001], [-115, -985], [-129, -1034], [-16, -1226], [194, -1304], [448, -1138], [470, -1178], [463, -1248], [289, -1418]],
+    features: [
+      { k: 'forest', t0: 0, t1: 0.25, d: 0.2 },
+      { k: 'forest', t0: 0.25, t1: 1, d: 0.8 },
+      { k: 'sidehits', t0: 0.1, t1: 0.95, gap: 38, h: 1.0 },
+      { k: 'log', t: 0.55, len: 8, lat: -8, ang: 0.15 },
+      { k: 'lamps', t0: 0.0, t1: 1, gap: 70 },
+    ],
+  },
+  {
+    id: 'snakegully', name: 'Snake Gully', diff: 'red', lift: 'kita', w: 15, groomed: false, bank: 1.6,
+    blurb: 'A winding natural halfpipe down the north-east flank. Pump the walls and keep it moving.',
+    pts: [[128, -1020], [184, -1074], [196, -1148], [286, -1172], [280, -1262], [399, -1259], [337, -1396]],
+    features: [
+      { k: 'forest', t0: 0, t1: 1, d: 0.85 },
+      { k: 'halfpipe', t0: 0.05, t1: 0.92, h: 3.8 },
+      { k: 'rollers', t0: 0.4, t1: 0.55, amp: 0.9, wl: 28 },
+      { k: 'log', t: 0.7, len: 8, lat: 0, h: 0.45 },
+    ],
+  },
+);
 const RUN_BY_ID = Object.fromEntries(RUNS.map((r, i) => [r.id, Object.assign(r, { index: i })]));
 const LIFT_BY_ID = Object.fromEntries(LIFTS.map((l, i) => [l.id, Object.assign(l, { index: i })]));
 

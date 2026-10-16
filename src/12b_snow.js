@@ -109,7 +109,7 @@ const Snow = {
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const px = x0 + (i + 0.5) * t - x, pz = z0 + (j + 0.5) * t - z;
       const u = Math.abs(px * ax + pz * az), v = Math.abs(-px * az + pz * ax);
-      const soft = t * 2.5;
+      const soft = t * 4.5;
       if (u > halfLen + soft || v > halfWid + soft) continue;
       // soft edges and rounded nose and tail, so the groove walls slump like real snow
       const ru = Math.max(0, u - (halfLen - halfWid));

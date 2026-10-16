@@ -584,7 +584,7 @@ const Player = {
     const G2 = this.grind;
     this.grind = null;
     const segs = G2.chain.concat(this.grindName(G2)).filter((n, i, a) => i === 0 || n !== a[i - 1]);
-    const name = (G2.spinOn ? `${G2.spinOn} on ` : '') + segs.join(' to ') + (G2.g.kind === 'box' ? ' (box)' : '');
+    const name = (G2.spinOn ? `${G2.spinOn} on ` : '') + segs.join(' to ') + (G2.g.kind === 'box' ? ' (box)' : G2.g.kind === 'log' ? ' (log)' : '');
     this.takeoff(false);
     this.air.ride = this.ride;
     this.air.fromGrind = true;
@@ -598,8 +598,8 @@ const Player = {
   collide() {
     const p = this.pos, R = 0.35, vel = this.vel;
     World.queryColliders(p.x, p.z, 4, this._col);
-    const limit = { tree: 8.5, rock: 6.5, building: 6, station: 6, cat: 6, tower: 7, pole: 7, gun: 7, sign: 7, box: 6.5, rail: 6.5 };
-    const names = { tree: 'Hugged a tree', rock: 'Hit a rock', building: 'Ran into a building', station: 'Hit the lift station', tower: 'Hit a lift tower', rail: 'Clipped the rail', box: 'Clipped the box', cat: 'Ran into a snowcat' };
+    const limit = { tree: 8.5, rock: 6.5, building: 6, station: 6, cat: 6, tower: 7, pole: 7, gun: 7, sign: 7, box: 6.5, rail: 6.5, log: 6.5 };
+    const names = { tree: 'Hugged a tree', rock: 'Hit a rock', building: 'Ran into a building', station: 'Hit the lift station', tower: 'Hit a lift tower', rail: 'Clipped the rail', box: 'Clipped the box', log: 'Tripped on a log', cat: 'Ran into a snowcat' };
     for (const c of this._col) {
       if (p.y > c.top) continue;
       // rocks are solid ground (World.groundHeight): ride over the small ones, the big ones act as walls

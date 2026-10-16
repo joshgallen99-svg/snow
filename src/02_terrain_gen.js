@@ -179,8 +179,44 @@ function profileOffset(run, path, s) {
 }
 
 function lateralShape(run, path, s, lat) {
-  // moguls: staggered bumps
   let off = 0;
+  const W = run.w, al = Math.abs(lat);
+  // shaped features (walls, pillows, side hits) smooth out where another run crosses
+  const calm = path.cross ? 1 - path.cross[clamp(Math.round(s / path.step), 0, path.n - 1)] : 1;
+  if (calm <= 0.001) return 0;
+  for (const f of run.features) {
+    const a = (f.t0 ?? 0) * path.len, b = (f.t1 ?? 1) * path.len;
+    if (f.k === 'halfpipe' && s > a && s < b) {
+      // a natural gully: the run's sides curl up into walls you can carve up and air out of
+      const env = sstep(a, a + 30, s) * sstep(b, b - 30, s) * calm;
+      const u = clamp(al / (W * 0.95), 0, 1.25);
+      off += f.h * env * Math.pow(u, 2.4) - f.h * env * 0.15;
+    } else if (f.k === 'pillows' && s > a && s < b) {
+      // snow-covered stumps and boulders: round mounds to pop off or drop over
+      const cs = 15, cl = 10;
+      const ci = Math.floor(s / cs), cj = Math.floor(lat / cl);
+      for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) {
+        const i = ci + di, j = cj + dj;
+        const hsh = hash2i(i * 7 + run.index * 131, j);
+        if (hsh > (f.d ?? 0.35)) continue;
+        const ms = (i + 0.2 + hash2i(i, j + 99) * 0.6) * cs, ml = (j + 0.2 + hash2i(i + 77, j) * 0.6) * cl;
+        if (Math.abs(ml) > W * 0.85) continue;
+        const r = 2.4 + hash2i(i + 5, j + 5) * 2.2, h = (0.8 + hash2i(i + 9, j + 3) * 1.4) * (f.h ?? 1);
+        const q = 1 - ((s - ms) ** 2 + (lat - ml) ** 2) / (r * r);
+        if (q > 0) off += h * q * q * calm;
+      }
+    } else if (f.k === 'sidehits' && s > a && s < b) {
+      // wedges of snow along the edges, alternating sides, to launch off as you carve
+      const gap = f.gap || 40, i = Math.floor((s - a) / gap), u = (s - a) / gap - i;
+      const side = i % 2 ? 1 : -1;
+      if (lat * side > 0) {
+        const along = Math.sin(clamp(u * 2.2, 0, 1) * Math.PI);
+        const across = sstep(W * 0.45, W * 0.78, al) * (1 - sstep(W * 0.95, W * 1.15, al));
+        off += (f.h ?? 1.4) * along * across * calm;
+      }
+    }
+  }
+  // moguls: staggered bumps
   for (const f of run.features) {
     if (f.k !== 'moguls') continue;
     const a = f.t0 * path.len, b = f.t1 * path.len;
@@ -273,6 +309,26 @@ function generateTerrain(progress) {
       const prof = computeProfile(run, path, sample);
       runData.push({ run, path, prof });
     }
+    // where runs cross or merge, mark the stretch so shaped features fade out there
+    for (const rd of runData) {
+      const P = rd.path, c = new Float32Array(P.n);
+      for (let i = 0; i < P.n; i++) {
+        const [x, z] = P.pts[i];
+        for (const o of runData) {
+          if (o === rd) continue;
+          const lim = (rd.run.w + o.run.w) * 0.9 + 12;
+          for (let j = 0; j < o.path.n; j += 2) {
+            const q = o.path.pts[j];
+            if (Math.abs(q[0] - x) < lim && Math.abs(q[1] - z) < lim && Math.hypot(q[0] - x, q[1] - z) < lim) { c[i] = 1; break; }
+          }
+          if (c[i]) break;
+        }
+      }
+      // soften the edges of each zone over ~30 m
+      const out = new Float32Array(P.n), R = Math.round(30 / P.step);
+      for (let i = 0; i < P.n; i++) { let m = 0; for (let k = -R; k <= R; k++) { const j = clamp(i + k, 0, P.n - 1); if (c[j]) m = Math.max(m, 1 - Math.abs(k) / (R + 1)); } out[i] = m; }
+      P.cross = out;
+    }
   });
   steps.push(() => {
     for (const rd of runData) {
@@ -322,6 +378,7 @@ function generateTerrain(progress) {
         target = lerp(target, target + (nat - yBase) * crossKeep * sstep(0, W, d), 1);
         const inner = (1 - sstep(W * 0.8, W + E, d)) * endFade;
         if (inner <= 0) continue;
+        // a cat track wins where it crosses another run: it stays a smooth bench across the slope
         const w = inner * inner + 1e-4;
         sumW[idx] += w; sumWT[idx] += w * target;
         if (inner > maxIn[idx]) {

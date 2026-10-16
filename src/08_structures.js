@@ -516,7 +516,7 @@ const Structures = {
       const m = new THREE.Mesh(g, stdMat({ flatShading: false, roughness: 0.75 }, { key: 'kicker' }));
       m.receiveShadow = true; m.castShadow = true; this.group.add(m);
     }
-    const b = new GeoBuilder();
+    const b = new GeoBuilder(), lb = new GeoBuilder();
     for (const gr of World.grinds) {
       const mx = (gr.ax + gr.bx) / 2, mz = (gr.az + gr.bz) / 2, my = (gr.ay + gr.by) / 2;
       const ry = Math.atan2(gr.dx, gr.dz);
@@ -527,6 +527,17 @@ const Structures = {
         // snow on-ramp
         const sx = gr.ax - gr.dx * 0.9, sz = gr.az - gr.dz * 0.9;
         b.add(G.box(gr.w * 2 + 0.6, gr.h, 1.8), { x: sx, y: World.height(sx, sz) + gr.h / 2 - 0.25, z: sz, ry, rx: 0.3, color: 0xe8eef6 });
+      } else if (gr.kind === 'log') {
+        // a fallen tree, bark-dark with snow along its top, on a couple of stumps
+        lb.add(G.cyl(0.2, 0.24, gr.len, 9), { x: mx, y: my - 0.2, z: mz, ry, rx: Math.PI / 2 + pitch, order: 'YXZ', color: 0x4a3a2e, colorFn: snowCap(0.5) });
+        lb.add(G.cyl(0.16, 0.2, 0.08, 9), { x: gr.bx, y: gr.by - 0.2, z: gr.bz, ry, rx: Math.PI / 2 + pitch, order: 'YXZ', color: 0xc9a77c });
+        for (const t of [0.2, 0.8]) {
+          const px = lerp(gr.ax, gr.bx, t), pz = lerp(gr.az, gr.bz, t), py = lerp(gr.ay, gr.by, t);
+          const gy = World.height(px, pz);
+          lb.add(G.cyl(0.16, 0.2, py - gy, 6), { x: px, y: (py + gy) / 2 - 0.25, z: pz, color: 0x3d3028 });
+        }
+        // a broken branch stub or two
+        lb.add(G.cyl(0.04, 0.07, 0.8, 5), { x: lerp(gr.ax, gr.bx, 0.45), y: lerp(gr.ay, gr.by, 0.45) + 0.1, z: lerp(gr.az, gr.bz, 0.45), rz: 0.7, ry, color: 0x4a3a2e });
       } else {
         b.add(G.cyl(0.055, 0.055, gr.len, 8), { x: mx, y: my, z: mz, ry, rx: Math.PI / 2 + pitch, order: 'YXZ', color: 0xd9dde2 });
         for (const t of [0.12, 0.88]) {
@@ -537,6 +548,7 @@ const Structures = {
       }
     }
     if (b.count) { const m = new THREE.Mesh(b.build(), this.metalMat); m.castShadow = true; m.receiveShadow = true; this.group.add(m); }
+    if (lb.count) { const m = new THREE.Mesh(lb.build(), this.propMat); m.castShadow = true; m.receiveShadow = true; this.group.add(m); }
   },
   buildCornices() {
     const b = new GeoBuilder();
