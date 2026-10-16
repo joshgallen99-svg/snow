@@ -411,6 +411,7 @@ const Game = {
         const spin = new V3().crossVectors(UP, Player.vel).normalize().multiplyScalar(2 + Player.vel.length() * 0.35);
         spin.x += (Math.random() - 0.5) * 3; spin.z += (Math.random() - 0.5) * 3;
         this.rider.startRagdoll(Player.vel.clone().multiplyScalar(0.8), spin);
+        FX.resetBody();
         FX.impact(Player.pos.x, Player.pos.y, Player.pos.z, Player.vel.x, Player.vel.z, 1.2, Player.surf.powder * (1 - Player.surf.groom) + 0.3);
         if (Cam.mode === 'cine') Cam.setMode('chase', 0.5);
       } else if (e.type === 'bump') { if (e.into > 2) Sound.bump(); }
@@ -463,6 +464,7 @@ const Game = {
       pl.crashT += dt;
       pl.pos.copy(this.rider.J[J.pelvis]);
       Snow.stampBody(this.rider.J);
+      FX.bodySpray(this.rider.J, dt);
       const R = this.rider.ragdoll;
       if (R && (R.still > 1.1 || R.t > 5)) this.respawn();
     }

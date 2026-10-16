@@ -282,6 +282,25 @@ const FX = {
     }, 'butterA');
     E.last.copy(p);
   },
+  // a crash: every limb that ploughs through the snow throws up a cloud
+  bodySpray(joints, dt) {
+    const prev = this._bodyPrev || (this._bodyPrev = joints.map((j) => j.clone()));
+    const R = Math.random;
+    for (let i = 0; i < joints.length; i++) {
+      const p = joints[i], q = prev[i];
+      const vx = (p.x - q.x) / Math.max(dt, 1e-3), vy = (p.y - q.y) / Math.max(dt, 1e-3), vz = (p.z - q.z) / Math.max(dt, 1e-3);
+      q.copy(p);
+      const sp = Math.hypot(vx, vz);
+      if (sp < 1.5 || p.y - World.groundHeight(p.x, p.z) > 0.35) continue;
+      let n = sp * dt * 5;
+      n = Math.floor(n) + (R() < n % 1 ? 1 : 0);
+      while (n-- > 0) {
+        if (R() < 0.7) this.puff(p.x, p.y, p.z, vx * 0.45 + (R() - 0.5) * 2, 1.5 + R() * 2.5 + sp * 0.12 + Math.max(0, -vy) * 0.3, vz * 0.45 + (R() - 0.5) * 2, 0.9 + R() * 0.9 + sp * 0.05, 1.1 + R() * 0.9, 0.55, 0.5, 1.3);
+        else this.chunk(p.x, p.y, p.z, vx * 0.5 + (R() - 0.5) * 3, 2 + R() * 3, vz * 0.5 + (R() - 0.5) * 3, 0.06 + R() * 0.09, 0.8 + R() * 0.5);
+      }
+    }
+  },
+  resetBody() { this._bodyPrev = null; },
   // rails: flecks of snow scraped off the top of the rail
   railSpray(dt, pl) {
     const G2 = pl.grind;
