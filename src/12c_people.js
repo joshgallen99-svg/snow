@@ -14,6 +14,7 @@ const People = {
     this.mat = stdMat({ roughness: 0.8, flatShading: false }, { key: 'people' });
     this.buildSlopeFolk();
     this.buildPassengers();
+    this.buildQueues();
   },
 
   // ---- figures, built in local space (x right, y up, z forward) ----------------------
@@ -128,6 +129,30 @@ const People = {
     }
   },
 
+  // ---- people waiting in the lift lines (they shuffle a little) ----------------------------
+  buildQueues() {
+    const rnd = mulberry32(55), spots = [];
+    for (const lift of Structures.lifts) {
+      if (lift.type.surface) continue;
+      const st = lift.stationA, d = lift.dir, r = lift.right;
+      const n = lift.type.cabin ? 8 : 6;
+      for (let k = 0; k < n; k++) {
+        const fwd = -(lift.type.cabin ? 16 : 10) - k * 1.6 - rnd() * 0.6, side = ((k % 5) - 2) * 1.6 + (rnd() - 0.5) * 0.4;
+        const x = st.x + d.x * fwd + r.x * side, z = st.z + d.z * fwd + r.z * side;
+        spots.push({ x, z, y: World.height(x, z), yaw: Math.atan2(d.x, d.z) + (rnd() - 0.5) * 0.8, ph: rnd() * TAU, skier: rnd() < 0.5, col: PEOPLE_COLORS[Math.floor(rnd() * PEOPLE_COLORS.length)] });
+      }
+    }
+    this.queue = spots;
+    const sk = spots.filter((q) => q.skier), bd = spots.filter((q) => !q.skier);
+    this.qSki = this.instanced(this.figure('skier'), sk.length);
+    this.qBoard = this.instanced(this.figure('rider'), bd.length);
+    const c = new THREE.Color();
+    sk.forEach((q, i) => { q.mesh = this.qSki; q.idx = i; });
+    bd.forEach((q, i) => { q.mesh = this.qBoard; q.idx = i; });
+    for (const q of spots) { q.mesh[0].setColorAt(q.idx, c.set(q.col)); q.mesh[1].setColorAt(q.idx, c.setScalar(0.7)); }
+    for (const m of [...this.qSki, ...this.qBoard]) if (m.instanceColor) m.instanceColor.needsUpdate = true;
+  },
+
   // ---- per frame ----------------------------------------------------------------------
   update(dt, cam, player, riding) {
     const cx = cam.position.x, cz = cam.position.z;
@@ -173,6 +198,12 @@ const People = {
       }
     }
     for (const m of [...this.skiMesh, ...this.boardMesh]) m.instanceMatrix.needsUpdate = true;
+    const t = U.uTime.value;
+    for (const q of this.queue) {
+      _m4.compose(p.set(q.x, q.y, q.z), _q.setFromAxisAngle(_v2.set(0, 1, 0), q.yaw + Math.sin(t * 0.4 + q.ph) * 0.25), _s.set(1, 1, 1));
+      q.mesh[0].setMatrixAt(q.idx, _m4); q.mesh[1].setMatrixAt(q.idx, _m4);
+    }
+    for (const m of [...this.qSki, ...this.qBoard]) m.instanceMatrix.needsUpdate = true;
     // passengers ride with their carriers
     const q = {};
     for (const P of this.lifts) {

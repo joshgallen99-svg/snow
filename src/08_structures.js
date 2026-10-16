@@ -307,10 +307,30 @@ const Structures = {
       const p = at(sgn * 3, 0), detach = T.speed > 4;
       b.add(G.box(lift.gauge + 4, 0.6, detach ? 18 : 9), o(at(sgn * 1, 0), { y: st.y + 0.1, color: concrete }));
       if (detach) {
-        b.add(G.box(lift.gauge + 2.4, 2.8, 14), o(p, { y: st.y + 6.0, color: 0xd9dcdf }));
-        b.add(G.box(lift.gauge + 2.6, 0.5, 14.2), o(p, { y: st.y + 7.6, color: c, colorFn: snowCap(0.6) }));
-        b.add(G.box(1.6, 5, 1.6), o(p, { y: st.y + 2.5, color: 0x7f868e }));
-        b.add(G.box(1.6, 5, 1.6), o(at(sgn * 8, 0), { y: st.y + 2.5, color: 0x7f868e }));
+        // a stadium-shaped bonnet over the bullwheel and the detach rails, with rounded ends
+        const W = lift.gauge + 2.4, Rr = W / 2, Lb = 14 - W;
+        const pm = at(sgn * 5.5, 0), e1 = at(sgn * 5.5 - sgn * Lb / 2, 0), e2 = at(sgn * 5.5 + sgn * Lb / 2, 0);
+        b.add(G.box(W, 2.8, Lb), o(pm, { y: st.y + 6.0, color: 0xd9dcdf }));
+        for (const e of [e1, e2]) b.add(G.cyl(Rr, Rr, 2.8, 18), o(e, { y: st.y + 6.0, color: 0xd9dcdf }));
+        b.add(G.box(W + 0.2, 0.5, Lb), o(pm, { y: st.y + 7.6, color: c }));
+        for (const e of [e1, e2]) b.add(G.cyl(Rr + 0.1, Rr + 0.1, 0.5, 18), o(e, { y: st.y + 7.6, color: c }));
+        // snow piled on the roof
+        b.add(G.box(W - 0.2, 0.35, Lb), o(pm, { y: st.y + 8.0, color: snow }));
+        for (const e of [e1, e2]) b.add(G.cyl(Rr - 0.1, Rr, 0.35, 18), o(e, { y: st.y + 8.0, color: snow }));
+        // dark skirt under the bonnet and a coloured stripe along its foot
+        b.add(G.box(W - 0.4, 0.3, Lb), o(pm, { y: st.y + 4.5, color: 0x2b2f35 }));
+        b.add(G.box(W + 0.05, 0.3, Lb), o(pm, { y: st.y + 4.85, color: c }));
+        // the bullwheel, just visible under the far end of the bonnet
+        b.add(G.cyl(lift.gauge / 2, lift.gauge / 2, 0.3, 24), o(at(sgn * 5.5 + sgn * (Lb / 2 + Rr * 0.4), 0), { y: st.y + 4.4, color: 0x30343a }));
+        for (const pp of [p, at(sgn * 8, 0)]) {
+          b.add(G.box(1.6, 5, 1.6), o(pp, { y: st.y + 2.5, color: 0x7f868e }));
+          b.add(G.box(2.4, 0.5, 2.4), o(pp, { y: st.y + 0.45, color: concrete }));
+        }
+        if (!end) {
+          // loading conveyor and the yellow "load here" boards
+          b.add(G.box(lift.gauge + 1, 0.08, 4.5), o(at(-2.5, 0), { y: st.y + 0.45, color: 0x23262c }));
+          for (const sd of [-1, 1]) b.add(G.box(0.08, 0.9, 1.6), o(at(-1, sd * (lift.gauge / 2 + 1.4)), { y: st.y + 0.9, color: 0xf2c335 }));
+        }
       } else {
         b.add(G.cyl(lift.gauge / 2 + 0.3, lift.gauge / 2 + 0.3, 0.5, 14), o(p, { y: st.y + 5.9, color: c, colorFn: snowCap(0.6) }));
         b.add(G.box(1.2, 5.6, 1.2), o(p, { y: st.y + 2.8, color: 0x7f868e }));
