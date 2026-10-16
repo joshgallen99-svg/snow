@@ -19,9 +19,10 @@ const MapView = {
         void main(){
           vec3 wp = (modelMatrix * vec4(position, 1.0)).xyz;
           float cd = distance(cameraPosition, wp);
-          vec3 lat = normalize(cross(vec3(0.0, 1.0, 0.0), aDir));
+          vec3 lat = cross(vec3(0.0, 1.0, 0.0), aDir); float ll = length(lat);
+          lat = ll > 1e-4 ? lat / ll : vec3(1.0, 0.0, 0.0); // zero-length direction: no NaN
           wp += lat * aSide * uWidth * 0.5 * cd * uPx;
-          wp += normalize(cameraPosition - wp) * min(cd * 0.012, 40.0) + vec3(0.0, uLift, 0.0);
+          wp += (cameraPosition - wp) / max(cd, 1e-3) * min(cd * 0.012, 40.0) + vec3(0.0, uLift, 0.0);
           vDist = aDist; vCam = cd;
           gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
         }`,
