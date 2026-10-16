@@ -6193,6 +6193,19 @@ const People = {
       const dl = Math.cos(ph) * n.amp * k;
       const x = c.x - c.tz * lat, z = c.z + c.tx * lat;
       const y = World.groundHeight(x, z);
+      // bumping into someone: you glance off and lose some speed, they wobble
+      if (player && player.ground && !player.crashed && !player.grind) {
+        const ddx = player.pos.x - x, ddz = player.pos.z - z, d2 = ddx * ddx + ddz * ddz;
+        if (d2 < 0.75 * 0.75 && Math.abs(player.pos.y - y) < 1.2) {
+          const d = Math.sqrt(d2) || 1e-3, nx = ddx / d, nz = ddz / d;
+          player.pos.x = x + nx * 0.76; player.pos.z = z + nz * 0.76;
+          const into = -(player.vel.x * nx + player.vel.z * nz);
+          if (into > 0) { player.vel.x += nx * into * 1.2; player.vel.z += nz * into * 1.2; }
+          player.vel.multiplyScalar(0.85);
+          n.roll = clamp(n.roll + (Math.random() - 0.5) * 1.6, -0.9, 0.9);
+          if (!n.bumpT || U.uTime.value - n.bumpT > 1) { n.bumpT = U.uTime.value; player.emit('bump', { kind: 'person', into: Math.max(3, into) }); }
+        }
+      }
       const hx = c.tx - c.tz * dl, hz = c.tz + c.tx * dl;
       const yaw = Math.atan2(hx, hz);
       // lean into the turn
