@@ -203,11 +203,11 @@ const TerrainMesh = {
       key: overlay ? 'terrainSnow' : 'terrain',
       uniforms: uni,
       vertexHead: overlay
-        ? 'varying vec4 vData; varying vec2 vData2; varying float vComp; varying vec2 vCuv; varying float vDepth;' + overlayHead
-        : 'attribute vec4 aData; attribute vec2 aData2; varying vec4 vData; varying vec2 vData2; varying float vComp; varying vec2 vCuv; varying float vDepth;',
-      vertexTail: overlay ? '' : 'vData = aData; vData2 = aData2; vComp = 0.0; vCuv = vec2(0.0); vDepth = 0.0;',
+        ? 'varying vec4 vData; varying vec2 vData2; varying float vComp; varying vec2 vCuv; varying float vDepth; varying float vGSlope;' + overlayHead
+        : 'attribute vec4 aData; attribute vec2 aData2; varying vec4 vData; varying vec2 vData2; varying float vComp; varying vec2 vCuv; varying float vDepth; varying float vGSlope;',
+      vertexTail: overlay ? '' : 'vData = aData; vData2 = aData2; vComp = 0.0; vCuv = vec2(0.0); vDepth = 0.0; vGSlope = -1.0;',
       fragHead: /* glsl */`
-        varying vec4 vData; varying vec2 vData2; varying float vComp; varying vec2 vCuv; varying float vDepth;
+        varying vec4 vData; varying vec2 vData2; varying float vComp; varying vec2 vCuv; varying float vDepth; varying float vGSlope;
         uniform vec3 uSunDir; uniform vec3 uSunColor; uniform float uMapMode; uniform float uNight;
         ${overlay ? 'uniform sampler2D uComp; uniform float uCompRes, uSize;' : ''}
         float th(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -218,7 +218,8 @@ const TerrainMesh = {
         float groomA = vData.x, powderA = vData.y, forestA = vData.z, roadA = vData.w;
         float camD = length(vWPos - cameraPosition);
         vec3 wn = normalize(vWNrm);
-        float slope = 1.0 - wn.y;
+        // the fresh-snow overlay takes rock from the ground under it, so groove walls stay snow
+        float slope = vGSlope >= 0.0 ? vGSlope : 1.0 - wn.y;
         vec3 snow = vec3(0.86, 0.90, 0.97);
         // groomed snow is a touch warmer and smoother, powder a touch bluer and brighter
         snow = mix(snow, vec3(0.90, 0.92, 0.95), groomA * 0.6);
@@ -280,6 +281,7 @@ const TerrainMesh = {
             float gx = hAt(w0 + vec2(1.5, 0.0)) - hAt(w0 - vec2(1.5, 0.0)), gz = hAt(w0 + vec2(0.0, 1.5)) - hAt(w0 - vec2(0.0, 1.5));
             float grade = length(vec2(gx, gz)) / 3.0;
             gSlopeK = 1.0 - smoothstep(0.55, 1.1, grade) * 0.8;
+            vGSlope = 1.0 - inversesqrt(1.0 + grade * grade);
           }
           float sY = snowY(sLoc, sComp);
           float e = 0.12;
