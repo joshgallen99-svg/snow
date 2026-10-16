@@ -32,16 +32,19 @@ const Vegetation = {
       b.add(G.ico(1, 1), { y: 3.4, sx: 1.9, sy: 3.6, sz: 1.8, color: rime });
       return b.build();
     }
-    const blobs = [[2.0, 1.1], [1.8, 2.3], [1.55, 3.4], [1.3, 4.4], [1.05, 5.3], [0.75, 6.1], [0.45, 6.7]];
-    blobs.forEach(([r, y], i) => {
-      const lean = i * 0.12;
-      for (let k = 0; k < 2; k++) {
-        const a = rnd() * TAU, o = r * 0.25;
-        b.add(G.ico(1, 1), { x: lean + Math.cos(a) * o, y, z: Math.sin(a) * o, sx: r, sy: r * 0.72, sz: r * 0.92, ry: rnd() * TAU, color: (i + k) % 3 ? rime : blue });
-      }
-      // needles peeking out on the sheltered side
-      if (i > 0 && i < 5) b.add(G.cone(r * 0.6, 0.7, 6), { x: lean - r * 0.75, y: y - 0.35, z: (rnd() - 0.5) * r, rz: 0.5, color: green });
-    });
+    // a tapering core plastered with rime lumps, leaning downwind; a few needles show on the lee side
+    b.add(G.ico(1, 1), { x: 0.3, y: 3.1, sx: 1.55, sy: 3.3, sz: 1.4, rz: -0.06, color: rime });
+    b.add(G.ico(1, 1), { x: 0.0, y: 1.2, sx: 1.9, sy: 1.3, sz: 1.8, color: blue });
+    for (let k = 0; k < 16; k++) {
+      const h = 0.6 + rnd() * 5.6, prof = 1 - Math.pow(Math.abs(h - 3.1) / 3.4, 1.6);
+      const a = rnd() * TAU, rr = (0.6 + 1.0 * prof) * (0.85 + rnd() * 0.3), r = 0.45 + rnd() * 0.55 * (0.4 + prof);
+      b.add(G.ico(1, 1), { x: 0.3 + h * 0.05 + Math.cos(a) * rr, y: h, z: Math.sin(a) * rr, sx: r * 1.1, sy: r * 0.8, sz: r, ry: rnd() * TAU, color: rnd() < 0.3 ? blue : rime });
+    }
+    for (let k = 0; k < 4; k++) {
+      const h = 1.4 + k * 1.1, a = Math.PI + (rnd() - 0.5) * 1.2, rr = 1.0 + (1 - k * 0.2) * 0.4;
+      b.add(G.cone(0.45, 0.7, 6), { x: Math.cos(a) * rr, y: h, z: Math.sin(a) * rr, rz: 0.6, ry: -a, color: green });
+    }
+    b.add(G.ico(0.5, 1), { x: 0.55, y: 6.6, sy: 1.3, color: rime });
     return b.build();
   },
   birchGeometry(lod) {
