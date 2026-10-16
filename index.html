@@ -6307,8 +6307,15 @@ const Sound = {
     const onSnow = riding && pl.ground && !pl.grind;
     const pw = pl.surf.powder * (1 - pl.surf.groom);
     this.bedSet('carve', onSnow ? sstep(2, 18, sp) * (0.05 + Math.abs(pl.edge) * 0.25) * (1 - pw * 0.6) : 0, 1800 + sp * 60);
-    this.bedSet('skid', onSnow ? (pl.skid + pl.brake * 0.6) * sstep(1, 10, sp) * 0.4 : 0, 900 + sp * 40);
-    this.bedSet('powder', onSnow ? pw * sstep(2, 14, sp) * 0.35 : 0, 380 + sp * 12);
+    // a hard stop is loud: the scrape grows with speed, and deep snow adds a heavy whump
+    const scrape = onSnow ? clamp(pl.skid * 1.2 + pl.brake * 0.8, 0, 1.3) * sstep(1, 10, sp) : 0;
+    this.bedSet('skid', scrape * (0.4 + sstep(8, 24, sp) * 0.35), 800 + sp * 45);
+    this.bedSet('powder', onSnow ? pw * (sstep(2, 14, sp) * 0.35 + scrape * 0.3) : 0, 380 + sp * 12);
+    if (onSnow && pl.brake > 0.45 && (this._lb || 0) <= 0.45 && sp > 7) {
+      const t = this.ctx.currentTime;
+      this.burstNoise(t, 'bandpass', 700 + pw * -250, 0.7, 0.25 + Math.min(0.35, sp / 60), 0.55 + pw * 0.3);
+    }
+    this._lb = onSnow ? pl.brake : 0;
     this.bedSet('ambient', mode === 'lift' ? 0.18 : 0.04, mode === 'lift' ? 180 : 300);
   },
   env(g, t, a, peak, decay) {
