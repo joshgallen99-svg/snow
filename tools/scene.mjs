@@ -9,6 +9,7 @@ const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
 const [script, quality = 'medium', time = '11.5', weather = 'clear', W = '1280', H = '720'] = process.argv.slice(2);
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: +W, height: +H } });
+page.setDefaultTimeout(300000);
 await page.addInitScript(([q, t, w]) => { localStorage.setItem('kitakaze-peak.v1', JSON.stringify({ settings: { quality: q, time: t, weather: w, unlockAll: true, music: 0, sfx: 0 } })); }, [quality, time, weather]);
 const errs = [];
 page.on('pageerror', (e) => errs.push(e.message));
@@ -31,7 +32,7 @@ for (const [act, a, b, c] of JSON.parse(script)) {
   else if (act === 'eval') console.log(JSON.stringify(await page.evaluate(a)));
   else if (act === 'shot') {
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-    await page.screenshot({ path: path.join(root, 'tools/out', a + '.png') });
+    await page.screenshot({ path: path.join(root, 'tools/out', a + '.png'), timeout: 300000 });
     console.log('shot', a, JSON.stringify(await page.evaluate(() => ({ st: Game.state, sp: +Player.speed.toFixed(1), g: Player.ground, crashed: Player.crashed }))));
   }
 }

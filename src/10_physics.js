@@ -205,13 +205,21 @@ const Player = {
       }
     }
     const h = World.groundHeight(this.pos.x, this.pos.z);
-    if (h - this.pos.y > 0.45) {
+    // climbing the side of a boulder that stands clear of the snow counts as hitting it
+    let rockWall = false;
+    const rkH = World.rockHeight(this.pos.x, this.pos.z), rkR = World.rockHit;
+    if (rkR && rkR.wall && rkH > prevY + 0.01 && rkH > World.height(this.pos.x, this.pos.z) + 0.05) {
+      const gn = World.groundNormal(this.pos.x, this.pos.z, new V3());
+      rockWall = gn.y < 0.85 && vT.x * gn.x + vT.z * gn.z < 0;
+    }
+    if (h - this.pos.y > 0.45 || rockWall) {
       // a step too tall to ride up (a drop seen from below, a cliff band): treat it as a wall
       this.pos.x -= vT.x * dt; this.pos.z -= vT.z * dt; this.pos.y = prevY;
       const gn = World.groundNormal(this.pos.x + vT.x * dt * 2, this.pos.z + vT.z * dt * 2, new V3());
       const gl = Math.hypot(gn.x, gn.z) || 1, gx = gn.x / gl, gz = gn.z / gl;
       const into = -(vT.x * gx + vT.z * gz);
-      if (into > 9) return this.crash('Hit a wall');
+      const rock = World.rockHeight(this.pos.x + vT.x * dt * 2, this.pos.z + vT.z * dt * 2) > World.height(this.pos.x, this.pos.z) + 0.3;
+      if (into > (rock ? 7.5 : 9)) return this.crash(rock ? 'Hit a rock' : 'Hit a wall');
       if (into > 0) { vT.x += gx * into * 1.2; vT.z += gz * into * 1.2; }
       vT.multiplyScalar(0.8);
       this.vel.copy(vT);
@@ -384,7 +392,8 @@ const Player = {
     // touchdown evaluation
     const speedT = vT.length();
     let reason = null;
-    if (flipRes > 0.9) reason = 'Over-rotated';
+    if (n.y < 0.6 && hard > 5) reason = World.rockHeight(this.pos.x, this.pos.z) >= World.height(this.pos.x, this.pos.z) ? 'Hit a rock' : 'Landed on a wall';
+    else if (flipRes > 0.9) reason = 'Over-rotated';
     else if (mis > 0.95 && speedT > 3) reason = 'Caught an edge';
     else if (hard > 19) reason = 'Flat landing';
     if (reason) { this.vel.copy(vT).addScaledVector(n, vn * 0.3); return this.crash(reason); }
@@ -593,6 +602,8 @@ const Player = {
     const names = { tree: 'Hugged a tree', rock: 'Hit a rock', building: 'Ran into a building', station: 'Hit the lift station', tower: 'Hit a lift tower', rail: 'Clipped the rail', box: 'Clipped the box', cat: 'Ran into a snowcat' };
     for (const c of this._col) {
       if (p.y > c.top) continue;
+      // rocks are solid ground (World.groundHeight): ride over the small ones, the big ones act as walls
+      if (c.kind === 'rock') continue;
       // brushing through low fir branches knocks their snow loose
       if (c.kind === 'tree' && c.ref) {
         const t = c.ref, canopy = t.s * (t.type ? 1.0 : 1.9) + R;

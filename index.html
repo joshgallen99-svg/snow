@@ -533,6 +533,8 @@ function fmtTime(t) {
 // ============================================================================
 const WORLD = { half: 1536, res: 2 };
 WORLD.N = Math.round((WORLD.half * 2) / WORLD.res) + 1;
+// rock ellipsoid half-axes per unit size (x, y, z) — shared by the mesh and the physics
+const ROCK_SHAPE = [1.15, 0.72, 1.0];
 const RESORT_NAME = 'Kitakaze Peak';
 const SUMMIT = [100, -950];
 
@@ -1266,9 +1268,41 @@ const World = {
     if (u > 0 || u < -1.8 || v > g.w + 0.3) return 0;
     return g.h * (1 + u / 1.8) * (1 - sstep(g.w, g.w + 0.3, v));
   },
-  // full ground height including kickers
+  // ---- rocks are part of the ground: low ones are bumps, big ones are walls ----
+  rockGrid: new Map(), rockCell: 8,
+  addRock(r) {
+    const cs = this.rockCell, R = Math.max(r.ax, r.az);
+    for (let j = Math.floor((r.z - R) / cs); j <= Math.floor((r.z + R) / cs); j++)
+      for (let i = Math.floor((r.x - R) / cs); i <= Math.floor((r.x + R) / cs); i++) {
+        const key = i * 8192 + j;
+        let a = this.rockGrid.get(key);
+        if (!a) this.rockGrid.set(key, (a = []));
+        a.push(r);
+      }
+  },
+  // highest rock surface at (x, z), or -Infinity
+  rockHeight(x, z) {
+    const a = this.rockGrid.get(Math.floor(x / this.rockCell) * 8192 + Math.floor(z / this.rockCell));
+    if (!a) return -Infinity;
+    let top = -Infinity;
+    this.rockHit = null;
+    for (const r of a) {
+      const dx = x - r.x, dz = z - r.z;
+      if (dx * dx + dz * dz > r.ax * r.ax) continue;
+      const c = Math.cos(r.rot), s = Math.sin(r.rot);
+      const lx = (dx * c - dz * s) / r.ax, lz = (dx * s + dz * c) / r.az;
+      const q = 1 - lx * lx - lz * lz;
+      if (q <= 0) continue;
+      const y = r.y + r.ay * Math.sqrt(q);
+      if (y > top) { top = y; this.rockHit = r; }
+    }
+    return top;
+  },
+  // full ground height including kickers and rocks
   groundHeight(x, z) {
     let h = this.height(x, z), add = 0;
+    const rk = this.rockHeight(x, z);
+    if (rk > h) h = rk;
     for (let i = 0; i < this.kickers.length; i++) {
       const k = this.kickers[i];
       if (Math.abs(x - k.x0) > 26 || Math.abs(z - k.z0) > 26) continue;
@@ -1651,9 +1685,13 @@ const Scatter = {
   },
   addRock(x, z, r, seed, cliff = false) {
     const y = World.height(x, z);
-    const rock = { x, z, y: y - r * 0.35, r, seed, rot: seed * TAU, cliff };
+    // the boulder is a squashed ellipsoid sunk a third into the ground; physics uses the same shape
+    const rock = { x, z, y: y - r * 0.35, r, seed, rot: seed * TAU, cliff, ax: ROCK_SHAPE[0] * r, ay: ROCK_SHAPE[1] * r * (cliff ? 1.3 : 1), az: ROCK_SHAPE[2] * r };
+    // boulders that stand well clear of the snow can't be ridden up: they're walls
+    rock.wall = rock.y + rock.ay - y > 0.55;
     this.rocks.push(rock);
-    World.addCollider(x, z, r * 0.85, y + r * 0.9, 'rock', rock);
+    World.addRock(rock);
+    World.addCollider(x, z, Math.max(rock.ax, rock.az), rock.y + rock.ay, 'rock', rock);
   },
 
   // ---- snowflake tokens: hovering collectibles -------------------------------------
@@ -1777,12 +1815,12 @@ function roofGeometry(w, d, h) {
 }
 
 // ---- shared uniforms ---------------------------------------------------------
-const MAX_LAMPS = 20;
+const MAX_LAMPS = 32;
 const U = {
   uTime: { value: 0 },
   uLamps: { value: Array.from({ length: MAX_LAMPS }, () => new THREE.Vector4(0, -1e5, 0, 0)) },
   uLampOn: { value: 0 },
-  uLampColor: { value: new THREE.Color(1.0, 0.78, 0.5) },
+  uLampC: { value: Array.from({ length: MAX_LAMPS }, () => new THREE.Vector4(1, 0.8, 0.5, 50)) },
   uSunDir: { value: new V3(0.4, 0.8, 0.3) },
   uSunColor: { value: new THREE.Color(1, 1, 1) },
   uLodCam: { value: new V3() },
@@ -1793,18 +1831,19 @@ const U = {
 
 const LAMP_GLSL = /* glsl */`
 uniform vec4 uLamps[${MAX_LAMPS}];
+uniform vec4 uLampC[${MAX_LAMPS}];
 uniform float uLampOn;
-uniform vec3 uLampColor;
+// xyz position, w intensity; colour rgb and reach in uLampC
 vec3 lampLight(vec3 wp, vec3 wn) {
   vec3 acc = vec3(0.0);
   if (uLampOn < 0.01) return acc;
   for (int i = 0; i < ${MAX_LAMPS}; i++) {
     vec3 L = uLamps[i].xyz - wp;
-    float d2 = dot(L, L);
-    if (d2 > 2500.0) continue;
-    float d = sqrt(d2);
+    float d2 = dot(L, L), R = uLampC[i].w;
+    if (d2 > R * R) continue;
+    float d = sqrt(d2), k = 50.0 / R;
     float ndl = max(dot(wn, L / d), 0.0) * 0.8 + 0.2;
-    acc += uLampColor * uLamps[i].w * ndl / (1.0 + d2 * 0.02) * (1.0 - smoothstep(26.0, 50.0, d));
+    acc += uLampC[i].rgb * uLamps[i].w * ndl / (1.0 + d2 * k * k * 0.02) * (1.0 - smoothstep(R * 0.52, R, d));
   }
   return acc * uLampOn;
 }
@@ -1815,7 +1854,7 @@ function patchStandard(mat, opts = {}) {
   const prev = mat.onBeforeCompile;
   mat.onBeforeCompile = (sh, r) => {
     if (prev) prev(sh, r);
-    Object.assign(sh.uniforms, { uLamps: U.uLamps, uLampOn: U.uLampOn, uLampColor: U.uLampColor, uTime: U.uTime });
+    Object.assign(sh.uniforms, { uLamps: U.uLamps, uLampC: U.uLampC, uLampOn: U.uLampOn, uTime: U.uTime });
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nvarying vec3 vWNrm;\n' + (opts.vertexHead || ''))
       .replace('#include <project_vertex>', `#include <project_vertex>
@@ -2273,9 +2312,10 @@ const Vegetation = {
     const offs = new Map();
     for (let i = 0; i < p.count; i++) {
       const key = `${p.getX(i).toFixed(3)},${p.getY(i).toFixed(3)},${p.getZ(i).toFixed(3)}`;
-      if (!offs.has(key)) offs.set(key, 0.75 + rnd() * 0.5);
+      // lumpy, but within a few percent of the ellipsoid the physics uses
+      if (!offs.has(key)) offs.set(key, 0.92 + rnd() * 0.14);
       const k = offs.get(key);
-      p.setXYZ(i, p.getX(i) * k * 1.15, p.getY(i) * k * 0.72, p.getZ(i) * k);
+      p.setXYZ(i, p.getX(i) * k * ROCK_SHAPE[0], p.getY(i) * k * ROCK_SHAPE[1], p.getZ(i) * k * ROCK_SHAPE[2]);
     }
     const b = new GeoBuilder();
     const rockA = new THREE.Color(0x56524e), rockB = new THREE.Color(0x45423f), snow = new THREE.Color(0xf0f4f8);
@@ -2563,11 +2603,13 @@ const Structures = {
     // towers
     const tb = new GeoBuilder();
     const steel = T.surface ? 0x8a8f96 : 0x6f7782, accent = L.color;
+    lift.towers = [];
     for (const s of sup) {
       if (s.station) continue;
       const x = ax + (bx - ax) * s.t, z = az + (bz - az) * s.t, y = tyAt(s.t), top = cableY(s.t);
       const h = top - y + 0.6;
       const ry = Math.atan2(dir.x, dir.z);
+      lift.towers.push({ x, y: top + 0.8, z });
       tb.add(G.box(1.6, 0.5, 1.6), { x, y: y + 0.1, z, ry, color: 0x8b8d8f });
       tb.add(G.cyl(T.surface ? 0.16 : 0.32, T.surface ? 0.22 : 0.5, h, 6), { x, y: y + h / 2, z, color: steel });
       tb.add(G.box(gauge + 1.4, 0.45, 0.5), { x, y: top + 0.55, z, ry: ry + Math.PI / 2, color: accent, colorFn: snowCap(0.6) });
@@ -3004,8 +3046,10 @@ const Structures = {
   buildSnowcats() {
     const b = new GeoBuilder();
     const spots = [[-200, -180, 0.4], [-560, 900, 2.2], [880, 560, -0.6]];
+    this.cats = [];
     for (const [x, z, ry] of spots) {
       const y = World.height(x, z);
+      this.cats.push({ x, z, y, ry });
       b.add(G.box(3.4, 1.0, 6.0), { x, y: y + 0.6, z, ry, color: 0x2a2d31 }); // tracks
       b.add(G.box(3.0, 1.4, 4.2), { x, y: y + 1.7, z, ry, color: 0xd62d20 });
       b.add(G.box(2.6, 1.2, 2.2), { x: x + Math.sin(ry) * 0.8, y: y + 3.0, z: z + Math.cos(ry) * 0.8, ry, color: 0xd62d20, colorFn: snowCap(0.8) });
@@ -3052,6 +3096,416 @@ const Structures = {
   update(dt, night) {
     for (const lift of this.lifts) this.updateLift(lift, dt);
     if (this.glowMat) this.glowMat.color.setScalar(0.15 + night * 3.0);
+  },
+};
+
+// ---- 08b_lights.js ----
+// ============================================================================
+//  lights — every light on the mountain: run floodlights, station and park
+//  LEDs, village lanterns, festoon strings, door lamps, lift tower lights and
+//  snowcat headlights and beacons. Each one can light the snow around it
+//  (the nearest few dozen go to the shaders), glow as a sprite from far away,
+//  throw a beam that shows up in falling snow, and leave a warm pool on the
+//  ground that you can see from the mountain cam.
+// ============================================================================
+const LIGHT_KINDS = {
+  //          colour                 intensity radius glow size
+  flood:   { c: [1.0, 0.78, 0.5],   I: 9,   R: 50, glow: 1.0 },  // sodium floodlights along night runs
+  led:     { c: [0.82, 0.9, 1.0],   I: 11,  R: 60, glow: 1.1 },  // park towers and lift stations
+  lantern: { c: [1.0, 0.6, 0.28],   I: 2.6, R: 18, glow: 0.45 }, // village street lanterns
+  door:    { c: [1.0, 0.66, 0.36],  I: 1.8, R: 13, glow: 0.3 },  // over doors and on decks
+  bulb:    { c: [1.0, 0.72, 0.42],  I: 1.4, R: 12, glow: 0.12 }, // festoon string (one light per string, many glows)
+  tower:   { c: [1.0, 0.55, 0.25],  I: 0.8, R: 10, glow: 0.22 }, // small lights on lift towers
+  head:    { c: [0.92, 0.95, 1.0],  I: 7,   R: 34, glow: 0.5 },  // snowcat headlights
+  beacon:  { c: [1.0, 0.48, 0.08],  I: 3.5, R: 22, glow: 0.5 },  // snowcat roof beacons
+  window:  { c: [1.0, 0.7, 0.4],    I: 1.6, R: 16, glow: 0 },    // light spilling out of big windows
+};
+
+const Lights = {
+  list: [], glowPts: [], beams: [], pools: [],
+
+  // add a light; o.glow:false for no sprite, o.beam = {dx,dy,dz,len,ang} for a visible cone, o.blink = rate
+  add(x, y, z, kind, o = {}) {
+    const K = LIGHT_KINDS[kind];
+    const L = { x, y, z, kind, c: o.c || K.c, I: (o.I ?? K.I), R: o.R || K.R, blink: o.blink || 0, phase: o.phase ?? Math.random() * TAU, lit: o.lit !== false };
+    if (L.lit) this.list.push(L);
+    if (o.glow !== false && K.glow > 0) this.glowPts.push({ x, y, z, c: L.c, s: (o.glowS || 1) * K.glow, blink: L.blink, phase: L.phase });
+    if (o.beam) this.beams.push(Object.assign({ x, y, z, c: L.c, blink: L.blink, phase: L.phase }, o.beam));
+    if (o.pool !== false && L.lit) {
+      // where the light lands: straight below, or along the beam
+      let px = x, pz = z;
+      if (o.beam) { const t = Math.min(o.beam.len * 0.6, (y - World.height(x, z)) / Math.max(0.2, -o.beam.dy)); px += o.beam.dx * t; pz += o.beam.dz * t; }
+      this.pools.push({ x: px, z: pz, r: L.R * 0.5, c: L.c, I: L.I, blink: L.blink, phase: L.phase });
+    }
+    return L;
+  },
+
+  init(scene) {
+    this.fixtures = new GeoBuilder({ smooth: false });
+    this.glass = new GeoBuilder();
+    this.cables = [];
+    this.placeRunLamps();
+    this.placeStations();
+    this.placePark();
+    this.placeVillage();
+    this.placeCats();
+    this.group = new THREE.Group(); this.group.name = 'lights';
+    scene.add(this.group);
+    if (this.fixtures.count) { const m = new THREE.Mesh(this.fixtures.build(), Structures.metalMat); m.castShadow = true; this.group.add(m); }
+    if (this.glass.count) this.group.add(new THREE.Mesh(this.glass.build(), Structures.glowMat));
+    this.buildCables();
+    this.buildGlows();
+    this.buildBeams();
+    this.buildPools();
+  },
+
+  // ---- placement ---------------------------------------------------------------
+  placeRunLamps() {
+    // the floodlight poles along night runs are built by Structures; light them here
+    for (const L of Scatter.lamps) {
+      const hy = L.y + 9.6;
+      const ry = Math.atan2(L.aimX, L.aimZ);
+      for (const sd of [-0.6, 0.6]) {
+        const hx = L.x + Math.cos(ry) * sd + L.aimX * 0.3, hz = L.z - Math.sin(ry) * sd + L.aimZ * 0.3;
+        const aim = new V3(L.aimX, -0.62, L.aimZ).normalize();
+        // one lit light per pole (two heads), two beams and glows
+        this.add(hx, hy - 0.15, hz, 'flood', { lit: sd < 0, I: 9, R: 52, pool: sd < 0, beam: { dx: aim.x, dy: aim.y, dz: aim.z, len: 22, ang: 0.42 } });
+      }
+    }
+  },
+  placeStations() {
+    for (const lift of Structures.lifts) {
+      const T = lift.type, d = lift.dir, r = lift.right;
+      for (const [st, end] of [[lift.stationA, false], [lift.stationB, true]]) {
+        const sgn = end ? 1 : -1;
+        // two LED floods on poles at the loading area, aimed at the ramp
+        for (const side of [-1, 1]) {
+          const off = (T.cabin ? 11 : 7) * side;
+          const x = st.x + r.x * off - d.x * sgn * (T.cabin ? 4 : 3), z = st.z + r.z * off - d.z * sgn * (T.cabin ? 4 : 3);
+          const y = World.height(x, z), h = T.surface ? 6 : 8;
+          this.pole(x, y, z, h);
+          const aim = new V3(-r.x * side * 0.6 - d.x * sgn * 0.5, -0.75, -r.z * side * 0.6 - d.z * sgn * 0.5).normalize();
+          this.head(x, y + h, z, aim, 0.5);
+          this.add(x + aim.x * 0.3, y + h - 0.1, z + aim.z * 0.3, 'led', { I: 7, R: 40, beam: { dx: aim.x, dy: aim.y, dz: aim.z, len: 16, ang: 0.5 } });
+        }
+        // warm light from the operator hut / station
+        this.add(st.x - d.x * sgn * 6 + r.x * 5, st.y + 3, st.z - d.z * sgn * 6 + r.z * 5, 'window', { glow: false });
+      }
+      // a small amber light on top of each tower, so lift lines trace across the mountain at night
+      for (const tw of lift.towers || []) this.add(tw.x, tw.y + 0.6, tw.z, 'tower', { lit: false, pool: false });
+    }
+  },
+  placePark() {
+    // tall light towers along the park, each with three heads
+    const park = World.runData.find((r) => r.run.diff === 'park');
+    if (!park) return;
+    const L = park.path.len;
+    let side = 1;
+    for (let s = 30; s < L - 20; s += 70) {
+      const c = World.pathAt(park, s);
+      const nx = -c.tz, nz = c.tx, off = park.run.w + 9;
+      const x = c.x + nx * off * side, z = c.z + nz * off * side, y = World.height(x, z);
+      const h = 15;
+      this.pole(x, y, z, h, 0.22);
+      World.addCollider(x, z, 0.4, y + h, 'pole', null);
+      for (const k of [-1, 0, 1]) {
+        const ax = -nx * side + c.tx * k * 0.5, az = -nz * side + c.tz * k * 0.5;
+        const aim = new V3(ax, -0.7, az).normalize();
+        const hx = x + c.tx * k * 0.8, hz = z + c.tz * k * 0.8;
+        this.head(hx, y + h, hz, aim, 0.7);
+        this.add(hx + aim.x * 0.4, y + h - 0.2, hz + aim.z * 0.4, 'led', { lit: k === 0, pool: k === 0, I: 8, R: 55, beam: { dx: aim.x, dy: aim.y, dz: aim.z, len: 26, ang: 0.38 } });
+      }
+      side = -side;
+    }
+  },
+  placeVillage() {
+    const rnd = mulberry32(31);
+    // lanterns along the village streets and the east base access road
+    for (const [ri, gap] of [[1, 20], [2, 24], [3, 26], [4, 30], [0, 34]]) {
+      const pts = resamplePath(ROADS[ri].pts, 4);
+      let acc = 0, side = 1;
+      for (let i = 1; i < pts.length; i++) {
+        const [x0, z0] = pts[i - 1], [x1, z1] = pts[i];
+        const seg = Math.hypot(x1 - x0, z1 - z0); acc += seg;
+        if (acc < gap) continue;
+        acc = 0;
+        const tx = (x1 - x0) / seg, tz = (z1 - z0) / seg;
+        const off = ROADS[ri].w + 2.2;
+        const x = x1 - tz * off * side, z = z1 + tx * off * side;
+        // the long valley road only gets lanterns near the village and the east base
+        if (ri === 0 && Math.abs(x + 600) > 450 && Math.abs(x - 850) > 250) continue;
+        if (World.attr(World.inRun, x, z) > 30) continue;
+        const y = World.height(x, z);
+        this.lantern(x, y, z);
+        World.addCollider(x, z, 0.2, y + 3.4, 'pole', null);
+        side = -side;
+      }
+    }
+    // door lamps on every building, and big warm windows on lodges and huts
+    for (const b of Scatter.buildings) {
+      const cs = Math.cos(b.rot), sn = Math.sin(b.rot);
+      const local = (lx, lz) => ({ x: b.x + lx * cs + lz * sn, z: b.z - lx * sn + lz * cs });
+      const front = local(0, -b.d / 2 - 0.35);
+      this.add(front.x, b.y + 3.0, front.z, 'door', { I: b.kind === 'lodge' ? 2.6 : 1.8 });
+      this.glass.add(G.box(0.35, 0.45, 0.35), { x: front.x, y: b.y + 3.1, z: front.z, ry: b.rot, color: 0xffd9a0 });
+      if (b.kind === 'lodge' || b.kind === 'hut') {
+        const back = local(b.w * 0.3, b.d / 2 + 0.5);
+        this.add(back.x, b.y + 2.5, back.z, 'window', { glow: false });
+        this.add(local(-b.w * 0.3, -b.d / 2 - 3).x, b.y + 2.5, local(-b.w * 0.3, -b.d / 2 - 3).z, 'window', { glow: false });
+      }
+    }
+    // festoon strings zig-zagging across the main street and over lodge decks
+    const strings = [];
+    const main = resamplePath(ROADS[1].pts, 2), cross = resamplePath(ROADS[2].pts, 2);
+    const across = (pts, i, w) => {
+      const [x0, z0] = pts[Math.max(0, i - 1)], [x1, z1] = pts[Math.min(pts.length - 1, i + 1)];
+      const l = Math.hypot(x1 - x0, z1 - z0) || 1, nx = -(z1 - z0) / l, nz = (x1 - x0) / l;
+      const [x, z] = pts[i];
+      return [[x + nx * w, z + nz * w], [x - nx * w, z - nz * w]];
+    };
+    for (let i = 4; i < main.length - 4; i += 9) {
+      const [a, b] = across(main, i, ROADS[1].w + 2.4), [c] = across(main, i + 9 < main.length ? i + 9 : i, ROADS[1].w + 2.4);
+      strings.push([a, b]); if (c) strings.push([b, c]);
+    }
+    for (let i = 10; i < cross.length - 10; i += 14) { const [a, b] = across(cross, i, ROADS[2].w + 2.2); strings.push([a, b]); }
+    for (const b of Scatter.buildings) {
+      if (b.kind !== 'lodge') continue;
+      const cs = Math.cos(b.rot), sn = Math.sin(b.rot);
+      const local = (lx, lz) => [b.x + lx * cs + lz * sn, b.z - lx * sn + lz * cs];
+      strings.push([local(-b.w * 0.4, -b.d / 2 - 1), local(b.w * 0.4, -b.d / 2 - 1)]);
+      strings.push([local(-b.w * 0.4, -b.d / 2 - 7.5), local(b.w * 0.4, -b.d / 2 - 7.5)]);
+    }
+    const bulbCols = [[1.0, 0.75, 0.45], [1.0, 0.62, 0.3], [1.0, 0.85, 0.6]];
+    for (const [[x0, z0], [x1, z1]] of strings) {
+      const y0 = World.height(x0, z0) + 4.6, y1 = World.height(x1, z1) + 4.6;
+      const len = Math.hypot(x1 - x0, z1 - z0);
+      if (len < 3 || len > 60) continue;
+      for (const [x, z, y] of [[x0, z0, y0], [x1, z1, y1]]) this.fixtures.add(G.cyl(0.06, 0.08, 4.8, 5), { x, y: y - 2.4, z, color: 0x3a2c22 });
+      const pts = [];
+      const n = Math.max(4, Math.round(len / 1.6));
+      for (let k = 0; k <= n; k++) {
+        const t = k / n, sag = Math.sin(t * Math.PI) * len * 0.07;
+        pts.push(new V3(lerp(x0, x1, t), lerp(y0, y1, t) - sag, lerp(z0, z1, t)));
+      }
+      this.cables.push(pts);
+      for (let k = 1; k < n; k++) {
+        const p = pts[k];
+        this.glowPts.push({ x: p.x, y: p.y - 0.12, z: p.z, c: bulbCols[Math.floor(rnd() * 3)], s: LIGHT_KINDS.bulb.glow, blink: 0, phase: 0 });
+      }
+      const m = pts[n >> 1];
+      this.add(m.x, m.y - 0.3, m.z, 'bulb', { glow: false, R: Math.max(10, len * 0.6) });
+    }
+  },
+  placeCats() {
+    for (const cat of Structures.cats || []) {
+      const { x, z, y, ry } = cat;
+      const fx = Math.sin(ry), fz = Math.cos(ry), rx = Math.cos(ry), rz = -Math.sin(ry);
+      for (const s of [-0.9, 0.9]) {
+        const hx = x + fx * 2.2 + rx * s, hz = z + fz * 2.2 + rz * s;
+        const aim = new V3(fx, -0.18, fz).normalize();
+        this.add(hx, y + 2.3, hz, 'head', { lit: s < 0, pool: s < 0, beam: { dx: aim.x, dy: aim.y, dz: aim.z, len: 18, ang: 0.32 } });
+      }
+      this.add(x + fx * 0.6, y + 3.8, z + fz * 0.6, 'beacon', { blink: 5.5, pool: false });
+      this.glass.add(G.cyl(0.16, 0.18, 0.28, 8), { x: x + fx * 0.6, y: y + 3.75, z: z + fz * 0.6, color: 0xff8a1a });
+    }
+  },
+
+  // ---- fixtures ------------------------------------------------------------------
+  pole(x, y, z, h, r = 0.13) {
+    this.fixtures.add(G.cyl(r * 0.7, r, h, 6), { x, y: y + h / 2, z, color: 0x41464d });
+    this.fixtures.add(G.cyl(0.03, 0.03, 0.01, 3), { x, y: y + h, z, color: 0x41464d });
+  },
+  head(x, y, z, aim, s) {
+    const ry = Math.atan2(aim.x, aim.z), rx = Math.acos(clamp(-aim.y, -1, 1));
+    this.fixtures.add(G.box(0.9 * s + 0.2, 0.5 * s + 0.15, 0.35), { x, y, z, ry, rx: Math.PI / 2 - rx + 0.0, order: 'YXZ', color: 0x2c3036, colorFn: snowCap(0.7) });
+    this.glass.add(G.box(0.8 * s + 0.15, 0.06, 0.3), { x: x + aim.x * 0.05, y: y - 0.2 * s - 0.05, z: z + aim.z * 0.05, ry, rx: Math.PI / 2 - rx, order: 'YXZ', color: 0xf4f6ff });
+  },
+  lantern(x, y, z) {
+    // a dark iron post with a little glass lantern box and a snow cap
+    this.fixtures.add(G.cyl(0.06, 0.09, 3.0, 6), { x, y: y + 1.5, z, color: 0x2a2826 });
+    this.fixtures.add(G.box(0.46, 0.08, 0.46), { x, y: y + 3.05, z, color: 0x2a2826 });
+    this.glass.add(G.box(0.34, 0.42, 0.34), { x, y: y + 3.3, z, color: 0xffc078 });
+    this.fixtures.add(G.cone(0.38, 0.28, 4), { x, y: y + 3.65, z, ry: Math.PI / 4, color: 0x2a2826, colorFn: snowCap(0.4) });
+    this.add(x, y + 3.3, z, 'lantern');
+  },
+
+  // ---- render pieces ---------------------------------------------------------------
+  buildCables() {
+    if (!this.cables.length) return;
+    const pos = [];
+    for (const pts of this.cables) for (let k = 0; k < pts.length - 1; k++) pos.push(pts[k].x, pts[k].y, pts[k].z, pts[k + 1].x, pts[k + 1].y, pts[k + 1].z);
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    this.group.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0x1d1f22, fog: true })));
+  },
+  // sprites: a soft core and a wide halo; they stay a few pixels wide however far away they are
+  buildGlows() {
+    const P = this.glowPts, n = P.length;
+    const pos = new Float32Array(n * 3), col = new Float32Array(n * 3), aux = new Float32Array(n * 3);
+    P.forEach((p, i) => { pos.set([p.x, p.y, p.z], i * 3); col.set(p.c, i * 3); aux.set([p.s, p.blink, p.phase], i * 3); });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('aCol', new THREE.BufferAttribute(col, 3));
+    g.setAttribute('aAux', new THREE.BufferAttribute(aux, 3));
+    this.glowU = { uOn: { value: 0 }, uPx: { value: 1 }, uTime: U.uTime, uHaze: { value: 0 } };
+    const m = new THREE.ShaderMaterial({
+      uniforms: this.glowU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      vertexShader: /* glsl */`
+        attribute vec3 aCol, aAux; uniform float uOn, uPx, uTime, uHaze; varying vec3 vC; varying float vK;
+        void main(){
+          vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv;
+          float d = -mv.z;
+          float blink = aAux.y > 0.0 ? pow(max(0.0, sin(uTime * aAux.y + aAux.z)), 6.0) : 1.0;
+          float px = aAux.x * uPx * 2400.0 / max(1.0, d) * (1.0 + uHaze * 1.5);
+          // far lights shrink to a bright pin-prick instead of vanishing
+          float far = max(px, 3.0 * uPx * sqrt(aAux.x));
+          gl_PointSize = far * step(0.01, uOn);
+          vK = uOn * blink * clamp(px / far, 0.35, 1.0) * exp(-d * 0.00012 * (1.0 + uHaze * 6.0));
+          vC = aCol;
+        }`,
+      fragmentShader: /* glsl */`
+        varying vec3 vC; varying float vK;
+        void main(){
+          float d = length(gl_PointCoord - 0.5) * 2.0;
+          float core = exp(-d * d * 22.0), halo = pow(max(0.0, 1.0 - d), 2.2) * 0.35;
+          gl_FragColor = vec4(mix(vC, vec3(1.0), core * 0.6) * (core * 1.4 + halo) * vK, 1.0);
+        }`,
+    });
+    this.glows = new THREE.Points(g, m);
+    this.glows.frustumCulled = false; this.glows.renderOrder = 3;
+    this.group.add(this.glows);
+  },
+  // light shafts: open cones, brightest along the axis and near the lamp, much stronger in falling snow
+  buildBeams() {
+    const B = this.beams;
+    if (!B.length) return;
+    const seg = 14, pos = [], dat = [], col = [], idx = [];
+    for (const b of B) {
+      const ax = new V3(b.dx, b.dy, b.dz).normalize();
+      const u = new V3().crossVectors(ax, Math.abs(ax.y) > 0.9 ? new V3(1, 0, 0) : UP).normalize(), w = new V3().crossVectors(ax, u);
+      const base = pos.length / 3, R = Math.tan(b.ang) * b.len;
+      pos.push(b.x, b.y, b.z); dat.push(0, 0, b.blink, b.phase); col.push(...b.c);
+      for (let k = 0; k <= seg; k++) {
+        const a = (k / seg) * TAU, cx = Math.cos(a), sx = Math.sin(a);
+        const p = new V3(b.x, b.y, b.z).addScaledVector(ax, b.len).addScaledVector(u, cx * R).addScaledVector(w, sx * R);
+        pos.push(p.x, p.y, p.z); dat.push(1, k / seg, b.blink, b.phase); col.push(...b.c);
+      }
+      for (let k = 0; k < seg; k++) idx.push(base, base + 1 + k, base + 2 + k);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('aDat', new THREE.Float32BufferAttribute(dat, 4));
+    g.setAttribute('aCol', new THREE.Float32BufferAttribute(col, 3));
+    g.setIndex(idx);
+    this.beamU = { uOn: { value: 0 }, uHaze: { value: 0 }, uTime: U.uTime };
+    const m = new THREE.ShaderMaterial({
+      uniforms: Object.assign(this.beamU, THREE.UniformsUtils.clone(THREE.UniformsLib.fog)), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: true,
+      vertexShader: /* glsl */`
+        attribute vec4 aDat; attribute vec3 aCol; uniform float uTime; varying float vT; varying vec3 vC; varying vec3 vW; varying float vB;
+        #include <fog_pars_vertex>
+        void main(){ vT = aDat.x; vC = aCol; vB = aDat.z > 0.0 ? pow(max(0.0, sin(uTime * aDat.z + aDat.w)), 6.0) : 1.0;
+          vec4 wp = modelMatrix * vec4(position, 1.0); vW = wp.xyz;
+          vec4 mvPosition = viewMatrix * wp; gl_Position = projectionMatrix * mvPosition;
+          #include <fog_vertex>
+        }`,
+      fragmentShader: /* glsl */`
+        uniform float uOn, uHaze; varying float vT; varying vec3 vC; varying vec3 vW; varying float vB;
+        #include <fog_pars_fragment>
+        void main(){
+          // softer toward the end of the cone, and faded where it would slice into the camera
+          float a = pow(1.0 - vT, 1.6) * smoothstep(0.0, 0.08, vT);
+          float near = smoothstep(1.5, 8.0, distance(vW, cameraPosition));
+          float k = a * near * uOn * vB * (0.04 + uHaze * 0.2);
+          gl_FragColor = vec4(vC * k, 1.0);
+          #ifdef USE_FOG
+            #ifdef FOG_EXP2
+              gl_FragColor.rgb *= exp(-fogDensity * fogDensity * vFogDepth * vFogDepth);
+            #endif
+          #endif
+        }`,
+    });
+    this.beamMesh = new THREE.Mesh(g, m);
+    this.beamMesh.frustumCulled = false; this.beamMesh.renderOrder = 4;
+    this.group.add(this.beamMesh);
+  },
+  // pools of light on the ground for lights too far away to be among the shader lights
+  buildPools() {
+    const P = this.pools, n = P.length;
+    const pos = [], dat = [], col = [], idx = [];
+    for (const p of P) {
+      const nrm = World.normal(p.x, p.z, new V3());
+      const u = new V3().crossVectors(nrm, new V3(0, 0, 1)).normalize(), w = new V3().crossVectors(u, nrm);
+      const y = World.height(p.x, p.z) + 0.35, base = pos.length / 3;
+      for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+        pos.push(p.x + (u.x * a + w.x * b) * p.r, y + (u.y * a + w.y * b) * p.r, p.z + (u.z * a + w.z * b) * p.r);
+        dat.push(a, b, p.I, p.blink); col.push(...p.c);
+      }
+      idx.push(base, base + 2, base + 1, base, base + 3, base + 2);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('aDat', new THREE.Float32BufferAttribute(dat, 4));
+    g.setAttribute('aCol', new THREE.Float32BufferAttribute(col, 3));
+    g.setIndex(idx);
+    this.poolU = { uOn: { value: 0 }, uNear: { value: 160 } };
+    const m = new THREE.ShaderMaterial({
+      uniforms: Object.assign(this.poolU, THREE.UniformsUtils.clone(THREE.UniformsLib.fog)), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: true,
+      polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8,
+      vertexShader: /* glsl */`
+        attribute vec4 aDat; attribute vec3 aCol; uniform float uNear; varying vec2 vUv; varying vec3 vC; varying float vK;
+        #include <fog_pars_vertex>
+        void main(){ vUv = aDat.xy; vC = aCol;
+          vec4 wp = modelMatrix * vec4(position, 1.0);
+          // fade in only beyond the range where the real shader lights take over
+          vK = aDat.z * smoothstep(uNear * 0.8, uNear * 1.3, distance(wp.xyz, cameraPosition));
+          vec4 mvPosition = viewMatrix * wp; gl_Position = projectionMatrix * mvPosition;
+          #include <fog_vertex>
+        }`,
+      fragmentShader: /* glsl */`
+        uniform float uOn; varying vec2 vUv; varying vec3 vC; varying float vK;
+        #include <fog_pars_fragment>
+        void main(){ float d = length(vUv); float a = pow(max(0.0, 1.0 - d), 2.0);
+          gl_FragColor = vec4(vC * a * vK * uOn * 0.07, 1.0);
+          #ifdef USE_FOG
+            #ifdef FOG_EXP2
+              gl_FragColor.rgb *= exp(-fogDensity * fogDensity * vFogDepth * vFogDepth);
+            #endif
+          #endif
+        }`,
+    });
+    this.poolMesh = new THREE.Mesh(g, m);
+    this.poolMesh.frustumCulled = false; this.poolMesh.renderOrder = 1;
+    this.group.add(this.poolMesh);
+  },
+
+  // ---- per frame: pick the lights that matter for the shaders --------------------------
+  _sel: [],
+  update(focus, cam, on, haze, px, frame) {
+    this.glowU.uOn.value = on; this.glowU.uPx.value = px; this.glowU.uHaze.value = haze;
+    if (this.beamU) { this.beamU.uOn.value = on; this.beamU.uHaze.value = haze; }
+    this.poolU.uOn.value = on;
+    const Lu = U.uLamps.value, Cu = U.uLampC.value;
+    const t = U.uTime.value;
+    if (frame % 8 === 0 || !this._sel.length) {
+      // brighter lights win from further away
+      const S = this._sel; S.length = 0;
+      for (const L of this.list) {
+        const d2 = (L.x - focus.x) ** 2 + (L.z - focus.z) ** 2;
+        if (d2 > 260 * 260) continue;
+        S.push([L, d2 / (L.I * L.R)]);
+      }
+      S.sort((a, b) => a[1] - b[1]);
+      if (S.length > MAX_LAMPS) S.length = MAX_LAMPS;
+    }
+    for (let i = 0; i < MAX_LAMPS; i++) {
+      const s = this._sel[i];
+      if (!s) { Lu[i].set(0, -1e5, 0, 0); Cu[i].set(0, 0, 0, 1); continue; }
+      const L = s[0];
+      const k = L.blink ? Math.pow(Math.max(0, Math.sin(t * L.blink + L.phase)), 6) : 1;
+      Lu[i].set(L.x, L.y, L.z, L.I * k);
+      Cu[i].set(L.c[0], L.c[1], L.c[2], L.R);
+    }
+    // the ground pools take over where the shader lights end
+    this.poolU.uNear.value = this._sel.length >= MAX_LAMPS ? Math.sqrt(this._sel[MAX_LAMPS - 1][1] * 60) : 260;
   },
 };
 
@@ -3136,6 +3590,8 @@ class RiderModel {
       board: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.38, metalness: 0.08 }),
       base: new THREE.MeshStandardMaterial({ color: 0x15161a, roughness: 0.5 }),
     };
+    // lamps and lanterns light the rider at night too
+    if (!opts.ghost) for (const k in this.mats) patchStandard(this.mats[k], { key: 'rider' + k });
     if (this.ghost) {
       const g = new THREE.MeshStandardMaterial({ color: 0x9fd4ff, emissive: 0x2a5a8a, transparent: true, opacity: 0.32, depthWrite: false });
       for (const k in this.mats) this.mats[k] = g;
@@ -3708,13 +4164,21 @@ const Player = {
       }
     }
     const h = World.groundHeight(this.pos.x, this.pos.z);
-    if (h - this.pos.y > 0.45) {
+    // climbing the side of a boulder that stands clear of the snow counts as hitting it
+    let rockWall = false;
+    const rkH = World.rockHeight(this.pos.x, this.pos.z), rkR = World.rockHit;
+    if (rkR && rkR.wall && rkH > prevY + 0.01 && rkH > World.height(this.pos.x, this.pos.z) + 0.05) {
+      const gn = World.groundNormal(this.pos.x, this.pos.z, new V3());
+      rockWall = gn.y < 0.85 && vT.x * gn.x + vT.z * gn.z < 0;
+    }
+    if (h - this.pos.y > 0.45 || rockWall) {
       // a step too tall to ride up (a drop seen from below, a cliff band): treat it as a wall
       this.pos.x -= vT.x * dt; this.pos.z -= vT.z * dt; this.pos.y = prevY;
       const gn = World.groundNormal(this.pos.x + vT.x * dt * 2, this.pos.z + vT.z * dt * 2, new V3());
       const gl = Math.hypot(gn.x, gn.z) || 1, gx = gn.x / gl, gz = gn.z / gl;
       const into = -(vT.x * gx + vT.z * gz);
-      if (into > 9) return this.crash('Hit a wall');
+      const rock = World.rockHeight(this.pos.x + vT.x * dt * 2, this.pos.z + vT.z * dt * 2) > World.height(this.pos.x, this.pos.z) + 0.3;
+      if (into > (rock ? 7.5 : 9)) return this.crash(rock ? 'Hit a rock' : 'Hit a wall');
       if (into > 0) { vT.x += gx * into * 1.2; vT.z += gz * into * 1.2; }
       vT.multiplyScalar(0.8);
       this.vel.copy(vT);
@@ -3887,7 +4351,8 @@ const Player = {
     // touchdown evaluation
     const speedT = vT.length();
     let reason = null;
-    if (flipRes > 0.9) reason = 'Over-rotated';
+    if (n.y < 0.6 && hard > 5) reason = World.rockHeight(this.pos.x, this.pos.z) >= World.height(this.pos.x, this.pos.z) ? 'Hit a rock' : 'Landed on a wall';
+    else if (flipRes > 0.9) reason = 'Over-rotated';
     else if (mis > 0.95 && speedT > 3) reason = 'Caught an edge';
     else if (hard > 19) reason = 'Flat landing';
     if (reason) { this.vel.copy(vT).addScaledVector(n, vn * 0.3); return this.crash(reason); }
@@ -4096,6 +4561,8 @@ const Player = {
     const names = { tree: 'Hugged a tree', rock: 'Hit a rock', building: 'Ran into a building', station: 'Hit the lift station', tower: 'Hit a lift tower', rail: 'Clipped the rail', box: 'Clipped the box', cat: 'Ran into a snowcat' };
     for (const c of this._col) {
       if (p.y > c.top) continue;
+      // rocks are solid ground (World.groundHeight): ride over the small ones, the big ones act as walls
+      if (c.kind === 'rock') continue;
       // brushing through low fir branches knocks their snow loose
       if (c.kind === 'tree' && c.ref) {
         const t = c.ref, canopy = t.s * (t.type ? 1.0 : 1.9) + R;
@@ -4247,38 +4714,90 @@ const Sky = {
     this.distantRange(scene);
   },
 
-  // mountains outside the play area, so the views go on forever
+  // mountains outside the play area, so the views go on forever: a ring of ridged terrain
+  // with a big lone volcano across the valley, shaded by height and slope
   distantRange(scene) {
-    const b = new GeoBuilder();
-    const rnd = mulberry32(8);
+    const R0 = 6150, R1 = 17000, NA = 1024, NR = 72;
+    const noise = makeSimplex(77), rnd = mulberry32(8);
     const peaks = [
-      // big symmetric volcano across the valley, like the one opposite the real resort
-      { a: 2.35, d: 7600, h: 1700, r: 3200, snow: 0.45 },
-      { a: 1.2, d: 7400, h: 1000, r: 2600, snow: 0.6 },
-      { a: 3.4, d: 7000, h: 1200, r: 2400, snow: 0.55 },
-      { a: 4.2, d: 7200, h: 1350, r: 2600, snow: 0.5 },
-      { a: 5.1, d: 7000, h: 1150, r: 2400, snow: 0.55 },
-      { a: 0.3, d: 7300, h: 1050, r: 2600, snow: 0.6 },
+      // the symmetric volcano across the valley, like the one opposite the real resort
+      { a: 2.3, d: 10200, h: 1850, r: 3600, cone: 1 },
+      { a: 1.15, d: 9000, h: 1100, r: 2200, cone: 0.4 },
+      { a: 3.55, d: 9600, h: 1250, r: 2600, cone: 0.3 },
+      { a: 4.3, d: 10400, h: 1450, r: 3000, cone: 0.5 },
+      { a: 5.15, d: 9400, h: 1150, r: 2400, cone: 0.3 },
+      { a: 0.25, d: 9900, h: 1250, r: 2800, cone: 0.35 },
     ];
-    for (let i = 0; i < 26; i++) peaks.push({ a: rnd() * TAU, d: 6200 + rnd() * 2200, h: 350 + rnd() * 650, r: 900 + rnd() * 1400, snow: 0.45 + rnd() * 0.3 });
-    const snowC = new THREE.Color(0xeef3f9), rockC = new THREE.Color(0x56606e), forestC = new THREE.Color(0x2b3a3a);
-    for (const p of peaks) {
-      const g = new THREE.ConeGeometry(p.r, p.h, 9, 4, true);
-      const pos = g.attributes.position;
-      for (let i = 0; i < pos.count; i++) {
-        const y = pos.getY(i);
-        const k = 1 + (rnd() - 0.5) * 0.22 * (1 - Math.abs(y / p.h));
-        pos.setXYZ(i, pos.getX(i) * k, y + (rnd() - 0.5) * p.h * 0.05, pos.getZ(i) * k);
+    for (let i = 0; i < 18; i++) peaks.push({ a: rnd() * TAU, d: 8200 + rnd() * 5000, h: 450 + rnd() * 700, r: 1100 + rnd() * 1400, cone: rnd() * 0.3 });
+    const ridged = (x, z) => {
+      let f = 1 / 2600, a = 1, sum = 0, w = 1;
+      for (let o = 0; o < 6; o++) {
+        let n = 1 - Math.abs(noise(x * f, z * f));
+        n *= n; sum += n * a * w; w = clamp(n * 1.6, 0, 1);
+        f *= 2.05; a *= 0.48;
       }
-      const x = Math.cos(p.a) * p.d, z = Math.sin(p.a) * p.d;
-      b.add(g, { x, y: p.h / 2 - 60, z, color: 0xffffff, colorFn: (nx, ny, nz, cx, cy) => {
-        const t = (cy + 60) / p.h;
-        return t > 1 - p.snow ? snowC : t > 0.25 ? rockC : forestC;
-      } });
+      return sum;
+    };
+    const height = (x, z, r) => {
+      let h = ridged(x, z) * 520 * sstep(R0 + 300, R0 + 2200, r);
+      for (const p of peaks) {
+        const px = Math.cos(p.a) * p.d, pz = Math.sin(p.a) * p.d;
+        const d = Math.hypot(x - px, z - pz) / p.r;
+        if (d > 1.6) continue;
+        // a volcano is a smooth concave cone with gullies down its flanks; others are rougher massifs
+        const cone = Math.max(0, 1 - d) ** 1.6;
+        const ang = Math.atan2(z - pz, x - px);
+        const gully = 1 - 0.08 * p.cone * Math.abs(Math.sin(ang * 13 + p.a * 7)) * sstep(0.1, 0.6, d);
+        const rough = 1 + (ridged(x * 1.7, z * 1.7) - 0.9) * 0.35 * (1 - p.cone);
+        h += p.h * cone * gully * rough * (1 - Math.max(0, 0.06 - d) * 6 * p.cone);
+      }
+      return h * (1 - sstep(R1 * 0.8, R1, r) * 0.7) + 110;
+    };
+    const pos = new Float32Array((NA + 1) * (NR + 1) * 3);
+    for (let j = 0; j <= NR; j++) {
+      const t = j / NR, r = R0 + (R1 - R0) * t * t * (0.6 + 0.4 * t) / 1.0;
+      for (let i = 0; i <= NA; i++) {
+        const a = (i / NA) * TAU, x = Math.cos(a) * r, z = Math.sin(a) * r;
+        const k = (j * (NA + 1) + i) * 3;
+        pos[k] = x; pos[k + 1] = height(x, z, r); pos[k + 2] = z;
+      }
     }
-    const m = new THREE.Mesh(b.build(), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+    const idx = new Uint32Array(NA * NR * 6);
+    let q = 0;
+    for (let j = 0; j < NR; j++) for (let i = 0; i < NA; i++) {
+      const a = j * (NA + 1) + i, b = a + 1, c = a + NA + 1, d = c + 1;
+      idx[q++] = a; idx[q++] = c; idx[q++] = b; idx[q++] = b; idx[q++] = c; idx[q++] = d;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    g.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0 });
+    patchStandard(mat, {
+      key: 'range',
+      fragColor: /* glsl */`
+        {
+          vec3 n = normalize(vWNrm);
+          float slope = 1.0 - n.y;
+          float big = dn(vWPos * 0.0011), fine = dn(vWPos * 0.006);
+          float tree = 520.0 + big * 260.0;
+          // snowy forest reads as a blue-grey speckle from this far away
+          vec3 forest = mix(vec3(0.33, 0.39, 0.42), vec3(0.62, 0.68, 0.74), fine * 0.6 + slope * 0.3);
+          vec3 rock = mix(vec3(0.36, 0.38, 0.42), vec3(0.5, 0.5, 0.53), fine);
+          vec3 snow = vec3(0.93, 0.95, 0.98);
+          float below = 1.0 - smoothstep(tree - 60.0, tree + 60.0, vWPos.y);
+          vec3 c = mix(snow, forest, below * (0.55 + 0.45 * smoothstep(0.08, 0.3, slope)));
+          // steep faces and ridge crests shed their snow
+          float bare = smoothstep(0.48 + big * 0.12, 0.62 + big * 0.12, slope) * (1.0 - below * 0.5);
+          c = mix(c, rock, bare);
+          diffuseColor.rgb = c;
+        }`,
+    });
+    const m = new THREE.Mesh(g, mat);
     m.frustumCulled = false;
+    m.renderOrder = -5;
     scene.add(m);
+    this.range = m;
   },
 
   initSnow(scene) {
@@ -4504,7 +5023,6 @@ const FX = {
     this.em = { dist: 0, last: null, plume: 0, mist: 0, butter: 0 };
     this.initTrail(scene);
     this.initTokens(scene);
-    this.initGlows(scene);
   },
   // tiling fbm noise, four decorrelated channels
   makeNoise() {
@@ -4845,23 +5363,6 @@ const FX = {
       }
     });
     m.instanceMatrix.needsUpdate = true; sm.instanceMatrix.needsUpdate = true;
-  },
-
-  // ---- glows for lamps and windows at night -------------------------------------------
-  initGlows(scene) {
-    const heads = Structures.lampHeads;
-    const pos = new Float32Array(heads.length * 3);
-    heads.forEach((h, i) => pos.set([h.gx, h.gy, h.gz], i * 3));
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    this.glowU = { uOn: { value: 0 }, uPx: { value: 1 } };
-    const m = new THREE.ShaderMaterial({
-      uniforms: this.glowU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-      vertexShader: 'uniform float uOn, uPx; void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * mv; gl_PointSize = uOn * uPx * 2600.0 / max(1.0, -mv.z); }',
-      fragmentShader: 'uniform float uOn; void main(){ float d = length(gl_PointCoord - 0.5); float a = pow(max(0.0, 1.0 - d * 2.0), 2.4); gl_FragColor = vec4(vec3(1.0, 0.82, 0.55) * a * uOn * 0.9, 1.0); }',
-    });
-    this.glows = new THREE.Points(g, m);
-    this.glows.frustumCulled = false;
-    scene.add(this.glows);
   },
 
   // ---- ambient emitters near the camera ---------------------------------------------------
@@ -6258,7 +6759,7 @@ const Game = {
     await step('Laying the snow', () => TerrainMesh.init(this.scene));
     await step('Dumping fresh powder', () => Snow.init(this.scene, this.settings.quality));
     await step('Growing the forest', () => Vegetation.init(this.scene));
-    await step('Stringing the lift cables', () => Structures.init(this.scene));
+    await step('Stringing the lift cables', () => { Structures.init(this.scene); Lights.init(this.scene); });
     await step('Lighting the sky', () => { Sky.init(this.scene); FX.init(this.scene); });
     await step('Printing the trail map', () => MapView.init(this.scene));
     await step('Polishing goggles', () => {
@@ -6302,7 +6803,7 @@ const Game = {
     this.viewport = { w: innerWidth, h: innerHeight };
     FX.mat && (FX.mat.uniforms.uPx.value = s.y / 1080);
     Sky.snowU && (Sky.snowU.uPx.value = s.y / 1080);
-    FX.glowU && (FX.glowU.uPx.value = s.y / 1080);
+    this.glowPx = s.y / 1080;
   },
   applySettings() {
     const s = this.settings;
@@ -6862,12 +7363,11 @@ const Game = {
     // world
     Structures.update(rdt, Sky.night);
     Sky.update(rdt, this.cam, st === 'ride' || st === 'paused' ? Player.pos : this.cam.position.clone().setY(World.height(this.cam.position.x, this.cam.position.z)), st === 'map' ? 'map' : 'ride');
-    this.updateLamps();
     if (st === 'ride') { FX.boardSpray(dt, Player); FX.railSpray(dt, Player); FX.trailUpdate(Player); this.speedMotes(dt); }
     if (st === 'ride' || st === 'title' || st === 'locker' || st === 'lift') FX.emitAmbient(dt, this.cam, Sky.night, Sky.weather.wind);
     FX.update(dt);
     FX.updateLight(this.cam);
-    FX.glowU.uOn.value = U.uLampOn.value;
+    Lights.update(st === 'ride' || st === 'paused' ? Player.pos : this.cam.position, this.cam, U.uLampOn.value, clamp(Sky.weather.snow * 1.2 + Sky.weather.overcast * 0.25, 0, 1.2), this.glowPx || 1, this.frame);
     if (st !== 'ride') FX.updateTokens(U.uTime.value, null, () => {});
     TerrainMesh.update(this.cam);
     // the fresh-snow layer follows whoever is standing in it
@@ -6922,16 +7422,6 @@ const Game = {
     const s = this.session, pl = Player, S = pl.surf;
     const surfaceName = pl.grind ? (pl.grind.g.kind === 'box' ? 'Box' : 'Rail') : !pl.ground ? 'Air' : S.road > 0.5 ? 'Road' : S.groom > 0.5 ? 'Groomed' : S.powder > 0.6 ? 'Powder' : 'Off-piste';
     return { run: s ? s.run : null, mode: s ? s.mode : 'free', timer: s ? s.timer + (s.missed || 0) * 3 : 0, progress: s ? s.progress : 0, score: s ? s.score : 0, surfaceName, weatherName: this.weatherName() };
-  },
-  updateLamps() {
-    if (this.frame % 10 !== 0) return;
-    const c = this.state === 'ride' ? Player.pos : this.cam.position;
-    const heads = Structures.lampHeads.map((h) => [h, (h.x - c.x) ** 2 + (h.z - c.z) ** 2]).sort((a, b) => a[1] - b[1]);
-    const L = U.uLamps.value;
-    for (let i = 0; i < MAX_LAMPS; i++) {
-      const h = heads[i];
-      if (h) L[i].set(h[0].x, h[0].y, h[0].z, 9); else L[i].set(0, -1e5, 0, 0);
-    }
   },
 };
 

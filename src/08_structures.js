@@ -170,11 +170,13 @@ const Structures = {
     // towers
     const tb = new GeoBuilder();
     const steel = T.surface ? 0x8a8f96 : 0x6f7782, accent = L.color;
+    lift.towers = [];
     for (const s of sup) {
       if (s.station) continue;
       const x = ax + (bx - ax) * s.t, z = az + (bz - az) * s.t, y = tyAt(s.t), top = cableY(s.t);
       const h = top - y + 0.6;
       const ry = Math.atan2(dir.x, dir.z);
+      lift.towers.push({ x, y: top + 0.8, z });
       tb.add(G.box(1.6, 0.5, 1.6), { x, y: y + 0.1, z, ry, color: 0x8b8d8f });
       tb.add(G.cyl(T.surface ? 0.16 : 0.32, T.surface ? 0.22 : 0.5, h, 6), { x, y: y + h / 2, z, color: steel });
       tb.add(G.box(gauge + 1.4, 0.45, 0.5), { x, y: top + 0.55, z, ry: ry + Math.PI / 2, color: accent, colorFn: snowCap(0.6) });
@@ -611,8 +613,10 @@ const Structures = {
   buildSnowcats() {
     const b = new GeoBuilder();
     const spots = [[-200, -180, 0.4], [-560, 900, 2.2], [880, 560, -0.6]];
+    this.cats = [];
     for (const [x, z, ry] of spots) {
       const y = World.height(x, z);
+      this.cats.push({ x, z, y, ry });
       b.add(G.box(3.4, 1.0, 6.0), { x, y: y + 0.6, z, ry, color: 0x2a2d31 }); // tracks
       b.add(G.box(3.0, 1.4, 4.2), { x, y: y + 1.7, z, ry, color: 0xd62d20 });
       b.add(G.box(2.6, 1.2, 2.2), { x: x + Math.sin(ry) * 0.8, y: y + 3.0, z: z + Math.cos(ry) * 0.8, ry, color: 0xd62d20, colorFn: snowCap(0.8) });

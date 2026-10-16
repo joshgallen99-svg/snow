@@ -115,9 +115,41 @@ const World = {
     if (u > 0 || u < -1.8 || v > g.w + 0.3) return 0;
     return g.h * (1 + u / 1.8) * (1 - sstep(g.w, g.w + 0.3, v));
   },
-  // full ground height including kickers
+  // ---- rocks are part of the ground: low ones are bumps, big ones are walls ----
+  rockGrid: new Map(), rockCell: 8,
+  addRock(r) {
+    const cs = this.rockCell, R = Math.max(r.ax, r.az);
+    for (let j = Math.floor((r.z - R) / cs); j <= Math.floor((r.z + R) / cs); j++)
+      for (let i = Math.floor((r.x - R) / cs); i <= Math.floor((r.x + R) / cs); i++) {
+        const key = i * 8192 + j;
+        let a = this.rockGrid.get(key);
+        if (!a) this.rockGrid.set(key, (a = []));
+        a.push(r);
+      }
+  },
+  // highest rock surface at (x, z), or -Infinity
+  rockHeight(x, z) {
+    const a = this.rockGrid.get(Math.floor(x / this.rockCell) * 8192 + Math.floor(z / this.rockCell));
+    if (!a) return -Infinity;
+    let top = -Infinity;
+    this.rockHit = null;
+    for (const r of a) {
+      const dx = x - r.x, dz = z - r.z;
+      if (dx * dx + dz * dz > r.ax * r.ax) continue;
+      const c = Math.cos(r.rot), s = Math.sin(r.rot);
+      const lx = (dx * c - dz * s) / r.ax, lz = (dx * s + dz * c) / r.az;
+      const q = 1 - lx * lx - lz * lz;
+      if (q <= 0) continue;
+      const y = r.y + r.ay * Math.sqrt(q);
+      if (y > top) { top = y; this.rockHit = r; }
+    }
+    return top;
+  },
+  // full ground height including kickers and rocks
   groundHeight(x, z) {
     let h = this.height(x, z), add = 0;
+    const rk = this.rockHeight(x, z);
+    if (rk > h) h = rk;
     for (let i = 0; i < this.kickers.length; i++) {
       const k = this.kickers[i];
       if (Math.abs(x - k.x0) > 26 || Math.abs(z - k.z0) > 26) continue;

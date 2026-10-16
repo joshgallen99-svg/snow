@@ -60,9 +60,10 @@ const Vegetation = {
     const offs = new Map();
     for (let i = 0; i < p.count; i++) {
       const key = `${p.getX(i).toFixed(3)},${p.getY(i).toFixed(3)},${p.getZ(i).toFixed(3)}`;
-      if (!offs.has(key)) offs.set(key, 0.75 + rnd() * 0.5);
+      // lumpy, but within a few percent of the ellipsoid the physics uses
+      if (!offs.has(key)) offs.set(key, 0.92 + rnd() * 0.14);
       const k = offs.get(key);
-      p.setXYZ(i, p.getX(i) * k * 1.15, p.getY(i) * k * 0.72, p.getZ(i) * k);
+      p.setXYZ(i, p.getX(i) * k * ROCK_SHAPE[0], p.getY(i) * k * ROCK_SHAPE[1], p.getZ(i) * k * ROCK_SHAPE[2]);
     }
     const b = new GeoBuilder();
     const rockA = new THREE.Color(0x56524e), rockB = new THREE.Color(0x45423f), snow = new THREE.Color(0xf0f4f8);

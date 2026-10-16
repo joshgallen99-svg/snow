@@ -74,12 +74,12 @@ function roofGeometry(w, d, h) {
 }
 
 // ---- shared uniforms ---------------------------------------------------------
-const MAX_LAMPS = 20;
+const MAX_LAMPS = 32;
 const U = {
   uTime: { value: 0 },
   uLamps: { value: Array.from({ length: MAX_LAMPS }, () => new THREE.Vector4(0, -1e5, 0, 0)) },
   uLampOn: { value: 0 },
-  uLampColor: { value: new THREE.Color(1.0, 0.78, 0.5) },
+  uLampC: { value: Array.from({ length: MAX_LAMPS }, () => new THREE.Vector4(1, 0.8, 0.5, 50)) },
   uSunDir: { value: new V3(0.4, 0.8, 0.3) },
   uSunColor: { value: new THREE.Color(1, 1, 1) },
   uLodCam: { value: new V3() },
@@ -90,18 +90,19 @@ const U = {
 
 const LAMP_GLSL = /* glsl */`
 uniform vec4 uLamps[${MAX_LAMPS}];
+uniform vec4 uLampC[${MAX_LAMPS}];
 uniform float uLampOn;
-uniform vec3 uLampColor;
+// xyz position, w intensity; colour rgb and reach in uLampC
 vec3 lampLight(vec3 wp, vec3 wn) {
   vec3 acc = vec3(0.0);
   if (uLampOn < 0.01) return acc;
   for (int i = 0; i < ${MAX_LAMPS}; i++) {
     vec3 L = uLamps[i].xyz - wp;
-    float d2 = dot(L, L);
-    if (d2 > 2500.0) continue;
-    float d = sqrt(d2);
+    float d2 = dot(L, L), R = uLampC[i].w;
+    if (d2 > R * R) continue;
+    float d = sqrt(d2), k = 50.0 / R;
     float ndl = max(dot(wn, L / d), 0.0) * 0.8 + 0.2;
-    acc += uLampColor * uLamps[i].w * ndl / (1.0 + d2 * 0.02) * (1.0 - smoothstep(26.0, 50.0, d));
+    acc += uLampC[i].rgb * uLamps[i].w * ndl / (1.0 + d2 * k * k * 0.02) * (1.0 - smoothstep(R * 0.52, R, d));
   }
   return acc * uLampOn;
 }
@@ -112,7 +113,7 @@ function patchStandard(mat, opts = {}) {
   const prev = mat.onBeforeCompile;
   mat.onBeforeCompile = (sh, r) => {
     if (prev) prev(sh, r);
-    Object.assign(sh.uniforms, { uLamps: U.uLamps, uLampOn: U.uLampOn, uLampColor: U.uLampColor, uTime: U.uTime });
+    Object.assign(sh.uniforms, { uLamps: U.uLamps, uLampC: U.uLampC, uLampOn: U.uLampOn, uTime: U.uTime });
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nvarying vec3 vWNrm;\n' + (opts.vertexHead || ''))
       .replace('#include <project_vertex>', `#include <project_vertex>

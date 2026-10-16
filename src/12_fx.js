@@ -77,7 +77,6 @@ const FX = {
     this.em = { dist: 0, last: null, plume: 0, mist: 0, butter: 0 };
     this.initTrail(scene);
     this.initTokens(scene);
-    this.initGlows(scene);
   },
   // tiling fbm noise, four decorrelated channels
   makeNoise() {
@@ -418,23 +417,6 @@ const FX = {
       }
     });
     m.instanceMatrix.needsUpdate = true; sm.instanceMatrix.needsUpdate = true;
-  },
-
-  // ---- glows for lamps and windows at night -------------------------------------------
-  initGlows(scene) {
-    const heads = Structures.lampHeads;
-    const pos = new Float32Array(heads.length * 3);
-    heads.forEach((h, i) => pos.set([h.gx, h.gy, h.gz], i * 3));
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    this.glowU = { uOn: { value: 0 }, uPx: { value: 1 } };
-    const m = new THREE.ShaderMaterial({
-      uniforms: this.glowU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-      vertexShader: 'uniform float uOn, uPx; void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * mv; gl_PointSize = uOn * uPx * 2600.0 / max(1.0, -mv.z); }',
-      fragmentShader: 'uniform float uOn; void main(){ float d = length(gl_PointCoord - 0.5); float a = pow(max(0.0, 1.0 - d * 2.0), 2.4); gl_FragColor = vec4(vec3(1.0, 0.82, 0.55) * a * uOn * 0.9, 1.0); }',
-    });
-    this.glows = new THREE.Points(g, m);
-    this.glows.frustumCulled = false;
-    scene.add(this.glows);
   },
 
   // ---- ambient emitters near the camera ---------------------------------------------------

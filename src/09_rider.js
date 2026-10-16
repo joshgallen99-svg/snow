@@ -78,6 +78,8 @@ class RiderModel {
       board: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.38, metalness: 0.08 }),
       base: new THREE.MeshStandardMaterial({ color: 0x15161a, roughness: 0.5 }),
     };
+    // lamps and lanterns light the rider at night too
+    if (!opts.ghost) for (const k in this.mats) patchStandard(this.mats[k], { key: 'rider' + k });
     if (this.ghost) {
       const g = new THREE.MeshStandardMaterial({ color: 0x9fd4ff, emissive: 0x2a5a8a, transparent: true, opacity: 0.32, depthWrite: false });
       for (const k in this.mats) this.mats[k] = g;

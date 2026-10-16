@@ -8,6 +8,8 @@
 // ============================================================================
 const WORLD = { half: 1536, res: 2 };
 WORLD.N = Math.round((WORLD.half * 2) / WORLD.res) + 1;
+// rock ellipsoid half-axes per unit size (x, y, z) — shared by the mesh and the physics
+const ROCK_SHAPE = [1.15, 0.72, 1.0];
 const RESORT_NAME = 'Kitakaze Peak';
 const SUMMIT = [100, -950];
 

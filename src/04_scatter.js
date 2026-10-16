@@ -298,9 +298,13 @@ const Scatter = {
   },
   addRock(x, z, r, seed, cliff = false) {
     const y = World.height(x, z);
-    const rock = { x, z, y: y - r * 0.35, r, seed, rot: seed * TAU, cliff };
+    // the boulder is a squashed ellipsoid sunk a third into the ground; physics uses the same shape
+    const rock = { x, z, y: y - r * 0.35, r, seed, rot: seed * TAU, cliff, ax: ROCK_SHAPE[0] * r, ay: ROCK_SHAPE[1] * r * (cliff ? 1.3 : 1), az: ROCK_SHAPE[2] * r };
+    // boulders that stand well clear of the snow can't be ridden up: they're walls
+    rock.wall = rock.y + rock.ay - y > 0.55;
     this.rocks.push(rock);
-    World.addCollider(x, z, r * 0.85, y + r * 0.9, 'rock', rock);
+    World.addRock(rock);
+    World.addCollider(x, z, Math.max(rock.ax, rock.az), rock.y + rock.ay, 'rock', rock);
   },
 
   // ---- snowflake tokens: hovering collectibles -------------------------------------

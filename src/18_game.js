@@ -84,7 +84,7 @@ const Game = {
     await step('Laying the snow', () => TerrainMesh.init(this.scene));
     await step('Dumping fresh powder', () => Snow.init(this.scene, this.settings.quality));
     await step('Growing the forest', () => Vegetation.init(this.scene));
-    await step('Stringing the lift cables', () => Structures.init(this.scene));
+    await step('Stringing the lift cables', () => { Structures.init(this.scene); Lights.init(this.scene); });
     await step('Lighting the sky', () => { Sky.init(this.scene); FX.init(this.scene); });
     await step('Printing the trail map', () => MapView.init(this.scene));
     await step('Polishing goggles', () => {
@@ -128,7 +128,7 @@ const Game = {
     this.viewport = { w: innerWidth, h: innerHeight };
     FX.mat && (FX.mat.uniforms.uPx.value = s.y / 1080);
     Sky.snowU && (Sky.snowU.uPx.value = s.y / 1080);
-    FX.glowU && (FX.glowU.uPx.value = s.y / 1080);
+    this.glowPx = s.y / 1080;
   },
   applySettings() {
     const s = this.settings;
@@ -688,12 +688,11 @@ const Game = {
     // world
     Structures.update(rdt, Sky.night);
     Sky.update(rdt, this.cam, st === 'ride' || st === 'paused' ? Player.pos : this.cam.position.clone().setY(World.height(this.cam.position.x, this.cam.position.z)), st === 'map' ? 'map' : 'ride');
-    this.updateLamps();
     if (st === 'ride') { FX.boardSpray(dt, Player); FX.railSpray(dt, Player); FX.trailUpdate(Player); this.speedMotes(dt); }
     if (st === 'ride' || st === 'title' || st === 'locker' || st === 'lift') FX.emitAmbient(dt, this.cam, Sky.night, Sky.weather.wind);
     FX.update(dt);
     FX.updateLight(this.cam);
-    FX.glowU.uOn.value = U.uLampOn.value;
+    Lights.update(st === 'ride' || st === 'paused' ? Player.pos : this.cam.position, this.cam, U.uLampOn.value, clamp(Sky.weather.snow * 1.2 + Sky.weather.overcast * 0.25, 0, 1.2), this.glowPx || 1, this.frame);
     if (st !== 'ride') FX.updateTokens(U.uTime.value, null, () => {});
     TerrainMesh.update(this.cam);
     // the fresh-snow layer follows whoever is standing in it
@@ -748,16 +747,6 @@ const Game = {
     const s = this.session, pl = Player, S = pl.surf;
     const surfaceName = pl.grind ? (pl.grind.g.kind === 'box' ? 'Box' : 'Rail') : !pl.ground ? 'Air' : S.road > 0.5 ? 'Road' : S.groom > 0.5 ? 'Groomed' : S.powder > 0.6 ? 'Powder' : 'Off-piste';
     return { run: s ? s.run : null, mode: s ? s.mode : 'free', timer: s ? s.timer + (s.missed || 0) * 3 : 0, progress: s ? s.progress : 0, score: s ? s.score : 0, surfaceName, weatherName: this.weatherName() };
-  },
-  updateLamps() {
-    if (this.frame % 10 !== 0) return;
-    const c = this.state === 'ride' ? Player.pos : this.cam.position;
-    const heads = Structures.lampHeads.map((h) => [h, (h.x - c.x) ** 2 + (h.z - c.z) ** 2]).sort((a, b) => a[1] - b[1]);
-    const L = U.uLamps.value;
-    for (let i = 0; i < MAX_LAMPS; i++) {
-      const h = heads[i];
-      if (h) L[i].set(h[0].x, h[0].y, h[0].z, 9); else L[i].set(0, -1e5, 0, 0);
-    }
   },
 };
 

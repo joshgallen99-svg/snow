@@ -86,38 +86,90 @@ const Sky = {
     this.distantRange(scene);
   },
 
-  // mountains outside the play area, so the views go on forever
+  // mountains outside the play area, so the views go on forever: a ring of ridged terrain
+  // with a big lone volcano across the valley, shaded by height and slope
   distantRange(scene) {
-    const b = new GeoBuilder();
-    const rnd = mulberry32(8);
+    const R0 = 6150, R1 = 17000, NA = 1024, NR = 72;
+    const noise = makeSimplex(77), rnd = mulberry32(8);
     const peaks = [
-      // big symmetric volcano across the valley, like the one opposite the real resort
-      { a: 2.35, d: 7600, h: 1700, r: 3200, snow: 0.45 },
-      { a: 1.2, d: 7400, h: 1000, r: 2600, snow: 0.6 },
-      { a: 3.4, d: 7000, h: 1200, r: 2400, snow: 0.55 },
-      { a: 4.2, d: 7200, h: 1350, r: 2600, snow: 0.5 },
-      { a: 5.1, d: 7000, h: 1150, r: 2400, snow: 0.55 },
-      { a: 0.3, d: 7300, h: 1050, r: 2600, snow: 0.6 },
+      // the symmetric volcano across the valley, like the one opposite the real resort
+      { a: 2.3, d: 10200, h: 1850, r: 3600, cone: 1 },
+      { a: 1.15, d: 9000, h: 1100, r: 2200, cone: 0.4 },
+      { a: 3.55, d: 9600, h: 1250, r: 2600, cone: 0.3 },
+      { a: 4.3, d: 10400, h: 1450, r: 3000, cone: 0.5 },
+      { a: 5.15, d: 9400, h: 1150, r: 2400, cone: 0.3 },
+      { a: 0.25, d: 9900, h: 1250, r: 2800, cone: 0.35 },
     ];
-    for (let i = 0; i < 26; i++) peaks.push({ a: rnd() * TAU, d: 6200 + rnd() * 2200, h: 350 + rnd() * 650, r: 900 + rnd() * 1400, snow: 0.45 + rnd() * 0.3 });
-    const snowC = new THREE.Color(0xeef3f9), rockC = new THREE.Color(0x56606e), forestC = new THREE.Color(0x2b3a3a);
-    for (const p of peaks) {
-      const g = new THREE.ConeGeometry(p.r, p.h, 9, 4, true);
-      const pos = g.attributes.position;
-      for (let i = 0; i < pos.count; i++) {
-        const y = pos.getY(i);
-        const k = 1 + (rnd() - 0.5) * 0.22 * (1 - Math.abs(y / p.h));
-        pos.setXYZ(i, pos.getX(i) * k, y + (rnd() - 0.5) * p.h * 0.05, pos.getZ(i) * k);
+    for (let i = 0; i < 18; i++) peaks.push({ a: rnd() * TAU, d: 8200 + rnd() * 5000, h: 450 + rnd() * 700, r: 1100 + rnd() * 1400, cone: rnd() * 0.3 });
+    const ridged = (x, z) => {
+      let f = 1 / 2600, a = 1, sum = 0, w = 1;
+      for (let o = 0; o < 6; o++) {
+        let n = 1 - Math.abs(noise(x * f, z * f));
+        n *= n; sum += n * a * w; w = clamp(n * 1.6, 0, 1);
+        f *= 2.05; a *= 0.48;
       }
-      const x = Math.cos(p.a) * p.d, z = Math.sin(p.a) * p.d;
-      b.add(g, { x, y: p.h / 2 - 60, z, color: 0xffffff, colorFn: (nx, ny, nz, cx, cy) => {
-        const t = (cy + 60) / p.h;
-        return t > 1 - p.snow ? snowC : t > 0.25 ? rockC : forestC;
-      } });
+      return sum;
+    };
+    const height = (x, z, r) => {
+      let h = ridged(x, z) * 520 * sstep(R0 + 300, R0 + 2200, r);
+      for (const p of peaks) {
+        const px = Math.cos(p.a) * p.d, pz = Math.sin(p.a) * p.d;
+        const d = Math.hypot(x - px, z - pz) / p.r;
+        if (d > 1.6) continue;
+        // a volcano is a smooth concave cone with gullies down its flanks; others are rougher massifs
+        const cone = Math.max(0, 1 - d) ** 1.6;
+        const ang = Math.atan2(z - pz, x - px);
+        const gully = 1 - 0.08 * p.cone * Math.abs(Math.sin(ang * 13 + p.a * 7)) * sstep(0.1, 0.6, d);
+        const rough = 1 + (ridged(x * 1.7, z * 1.7) - 0.9) * 0.35 * (1 - p.cone);
+        h += p.h * cone * gully * rough * (1 - Math.max(0, 0.06 - d) * 6 * p.cone);
+      }
+      return h * (1 - sstep(R1 * 0.8, R1, r) * 0.7) + 110;
+    };
+    const pos = new Float32Array((NA + 1) * (NR + 1) * 3);
+    for (let j = 0; j <= NR; j++) {
+      const t = j / NR, r = R0 + (R1 - R0) * t * t * (0.6 + 0.4 * t) / 1.0;
+      for (let i = 0; i <= NA; i++) {
+        const a = (i / NA) * TAU, x = Math.cos(a) * r, z = Math.sin(a) * r;
+        const k = (j * (NA + 1) + i) * 3;
+        pos[k] = x; pos[k + 1] = height(x, z, r); pos[k + 2] = z;
+      }
     }
-    const m = new THREE.Mesh(b.build(), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+    const idx = new Uint32Array(NA * NR * 6);
+    let q = 0;
+    for (let j = 0; j < NR; j++) for (let i = 0; i < NA; i++) {
+      const a = j * (NA + 1) + i, b = a + 1, c = a + NA + 1, d = c + 1;
+      idx[q++] = a; idx[q++] = c; idx[q++] = b; idx[q++] = b; idx[q++] = c; idx[q++] = d;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    g.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0 });
+    patchStandard(mat, {
+      key: 'range',
+      fragColor: /* glsl */`
+        {
+          vec3 n = normalize(vWNrm);
+          float slope = 1.0 - n.y;
+          float big = dn(vWPos * 0.0011), fine = dn(vWPos * 0.006);
+          float tree = 520.0 + big * 260.0;
+          // snowy forest reads as a blue-grey speckle from this far away
+          vec3 forest = mix(vec3(0.33, 0.39, 0.42), vec3(0.62, 0.68, 0.74), fine * 0.6 + slope * 0.3);
+          vec3 rock = mix(vec3(0.36, 0.38, 0.42), vec3(0.5, 0.5, 0.53), fine);
+          vec3 snow = vec3(0.93, 0.95, 0.98);
+          float below = 1.0 - smoothstep(tree - 60.0, tree + 60.0, vWPos.y);
+          vec3 c = mix(snow, forest, below * (0.55 + 0.45 * smoothstep(0.08, 0.3, slope)));
+          // steep faces and ridge crests shed their snow
+          float bare = smoothstep(0.48 + big * 0.12, 0.62 + big * 0.12, slope) * (1.0 - below * 0.5);
+          c = mix(c, rock, bare);
+          diffuseColor.rgb = c;
+        }`,
+    });
+    const m = new THREE.Mesh(g, mat);
     m.frustumCulled = false;
+    m.renderOrder = -5;
     scene.add(m);
+    this.range = m;
   },
 
   initSnow(scene) {
