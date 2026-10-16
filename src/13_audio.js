@@ -34,6 +34,8 @@ const Sound = {
     bed('skid', 'lowpass', 1400, 0.7);
     bed('powder', 'lowpass', 520, 0.5);
     bed('ambient', 'lowpass', 300, 0.3);
+    bed('whistle', 'bandpass', 2400, 5);
+    bed('rumble', 'lowpass', 160, 0.7);
     this.ready = true;
     this.initMusic();
   },
@@ -55,7 +57,10 @@ const Sound = {
     const riding = mode === 'ride' && !pl.crashed;
     const sp = riding ? pl.speed : 0;
     const air = riding && !pl.ground;
-    this.bedSet('wind', 0.02 + sstep(3, 30, sp) * 0.22 + weather.wind * 0.12 + (air ? 0.05 : 0), 280 + sp * 30);
+    // wind roars and whistles harder the faster you go; the board chatters underfoot
+    this.bedSet('wind', 0.02 + Math.pow(sstep(3, 32, sp), 1.3) * 0.42 + weather.wind * 0.12 + (air ? 0.08 : 0), 260 + sp * 42);
+    this.bedSet('whistle', sstep(14, 32, sp) * 0.1 + (air ? sstep(10, 30, sp) * 0.05 : 0), 1700 + sp * 70);
+    this.bedSet('rumble', riding && pl.ground && !pl.grind ? sstep(6, 30, sp) * 0.35 * (1 - pl.surf.powder * (1 - pl.surf.groom) * 0.6) : 0, 120 + sp * 4);
     const onSnow = riding && pl.ground && !pl.grind;
     const pw = pl.surf.powder * (1 - pl.surf.groom);
     this.bedSet('carve', onSnow ? sstep(2, 18, sp) * (0.05 + Math.abs(pl.edge) * 0.25) * (1 - pw * 0.6) : 0, 1800 + sp * 60);

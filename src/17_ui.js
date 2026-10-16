@@ -123,6 +123,16 @@ const UI = {
   },
   updateHud(pl, G2) {
     $('hSpeed').textContent = Math.round(pl.speed * 3.6);
+    $('hSpeed').parentElement.classList.toggle('fast', pl.speed * 3.6 > 65);
+    // rail balance bar
+    const g = pl.grind, bal = $('balance');
+    if (g) {
+      bal.hidden = false;
+      $('balNeedle').style.left = (50 + clamp(g.bal, -1.05, 1.05) * 50).toFixed(2) + '%';
+      bal.classList.toggle('sweet', Math.abs(g.bal) < 0.35);
+      bal.classList.toggle('danger', Math.abs(g.bal) > 0.75);
+      bal.style.opacity = g.snap.toFixed(2);
+    } else bal.hidden = true;
     $('hAlt').textContent = `${Math.round(pl.pos.y + 230)} m · ${G2.surfaceName}`;
     $('hClock').textContent = `${Sky.label()} · ${G2.weatherName}`;
     $('hScore').textContent = G2.score.toLocaleString();
@@ -145,7 +155,7 @@ const UI = {
     const box = $('tricks');
     const d = document.createElement('div');
     d.className = 'trick glass' + (e.sketch ? ' sketch' : '');
-    d.innerHTML = `${esc(e.name)}<b class="num">+${e.pts.toLocaleString()}</b>${e.mult > 1 ? `<em>×${e.mult.toFixed(1)}</em>` : ''}${e.sketch ? '<em>sketchy</em>' : ''}`;
+    d.innerHTML = e.pop ? `${esc(e.name)}<em>+speed +height</em>` : `${esc(e.name)}<b class="num">+${e.pts.toLocaleString()}</b>${e.mult > 1 ? `<em>×${e.mult.toFixed(1)}</em>` : ''}${e.sketch ? '<em>sketchy</em>' : ''}`;
     box.prepend(d);
     while (box.children.length > 4) box.lastChild.remove();
     setTimeout(() => d.classList.add('out'), 2200);

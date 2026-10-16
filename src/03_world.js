@@ -72,7 +72,12 @@ const World = {
           const c = this.pathAt(rd, f.t * L);
           const nx = -c.tz, nz = c.tx; // left normal
           const x0 = c.x + nx * (f.lat || 0) - c.tx * K[0] * 0.5, z0 = c.z + nz * (f.lat || 0) - c.tz * K[0] * 0.5;
-          this.kickers.push({ x0, z0, dx: c.tx, dz: c.tz, len: K[0], lip: K[1], w: K[2], back: 1.6, size: f.size, run: run.index });
+          // shape the ramp so the lip leaves at a real angle above horizontal, whatever the slope under it
+          const len = K[0], p = 2.4;
+          const s0 = (this.height(x0, z0) - this.height(x0 + c.tx * len, z0 + c.tz * len)) / len;
+          const angle = [18, 21, 24, 26][f.size] * DEG;
+          const lip = clamp(((Math.tan(angle) + s0) * len) / p, K[1], K[1] * 1.3);
+          this.kickers.push({ x0, z0, dx: c.tx, dz: c.tz, len, lip, p, w: K[2], back: 1.6 + lip * 0.3, size: f.size, run: run.index });
         } else if (f.k === 'box' || f.k === 'rail') {
           const c = this.pathAt(rd, f.t * L);
           const nx = -c.tz, nz = c.tx;
@@ -98,7 +103,7 @@ const World = {
     if (v > hw + 0.9) return 0;
     const side = 1 - sstep(hw, hw + 0.9, v);
     let o;
-    if (u <= k.len) { const t = u / k.len; o = k.lip * t * t; } else o = k.lip * (1 - (u - k.len) / k.back);
+    if (u <= k.len) o = k.lip * Math.pow(u / k.len, k.p || 2); else o = k.lip * (1 - (u - k.len) / k.back);
     return o * side;
   },
   // box entry ramps are ground; tops handled by the grind system

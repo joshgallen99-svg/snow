@@ -153,7 +153,7 @@ function profileOffset(run, path, s) {
     } else if (f.k === 'kicker') {
       const K = KICKER_SIZES[f.size];
       const lip = f.t * L + K[0] * 0.5;              // lip position (kicker centered on t)
-      const g0 = lip + K[0] * 0.25, g1 = g0 + K[4] * 0.55, g2 = g1 + K[4] * 4.0;
+      const g0 = lip + K[0] * 0.3, g1 = g0 + K[4] * 1.1, g2 = g1 + K[4] * 4.5;
       if (s > g0) {
         if (s < g1) off -= K[3] * sstep(g0, g1, s);
         else if (s < g2) off -= K[3] * (1 - sstep(g1, g2, s));

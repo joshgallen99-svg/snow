@@ -104,15 +104,15 @@ const RUNS = [
     pts: [[-88, 438], [-72, 540], [-56, 650], [-46, 742]],
     features: [
       { k: 'forest', t0: 0, t1: 1, d: 0.6 },
-      { k: 'box', t: 0.12, len: 10, lat: -9 },
-      { k: 'rail', t: 0.13, len: 9, lat: 9, h: 0.9 },
+      { k: 'box', t: 0.12, len: 15, lat: -9 },
+      { k: 'rail', t: 0.13, len: 16, lat: 9, h: 0.9 },
       { k: 'kicker', t: 0.3, size: 1, lat: -8 },
       { k: 'kicker', t: 0.32, size: 2, lat: 8 },
-      { k: 'box', t: 0.5, len: 12, lat: 0 },
+      { k: 'box', t: 0.5, len: 17, lat: 0 },
       { k: 'kicker', t: 0.64, size: 2, lat: -7 },
       { k: 'kicker', t: 0.66, size: 3, lat: 9 },
-      { k: 'rail', t: 0.86, len: 11, lat: -8, h: 1.0 },
-      { k: 'box', t: 0.87, len: 9, lat: 8 },
+      { k: 'rail', t: 0.86, len: 18, lat: -8, h: 1.0 },
+      { k: 'box', t: 0.87, len: 14, lat: 8 },
       { k: 'lamps', t0: 0, t1: 1, gap: 40 },
     ],
   },
@@ -201,10 +201,10 @@ const LIFT_BY_ID = Object.fromEntries(LIFTS.map((l, i) => [l.id, Object.assign(l
 
 // kicker sizes: [length, lip height, width, landing drop, landing length]
 const KICKER_SIZES = [
-  [6, 0.9, 5, 1.4, 14],
-  [9, 1.9, 7, 3.0, 24],
-  [12, 2.9, 8, 4.6, 32],
-  [15, 3.8, 9, 6.2, 40],
+  [6, 0.9, 5, 2.0, 16],
+  [9, 1.9, 7, 4.0, 26],
+  [12, 2.9, 8, 6.0, 34],
+  [15, 3.8, 9, 8.0, 42],
 ];
 
 // Village and base buildings: [x, z, kind, rotation]

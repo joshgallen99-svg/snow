@@ -132,7 +132,7 @@ const Player = {
     // deep snow bogs you down when slow and lets you plane on top when fast
     const bog = 1 + 0.9 * (1 - sstep(4, 15, speed));
     const mu = lerp(lerp(0.055, 0.035, S.groom), 0.1 * bog, S.powder * (1 - S.groom)) + S.road * 0.6;
-    const drag = this.tuck > 0.5 ? 0.0026 : 0.0042 + this.brake * 0.003;
+    const drag = this.tuck > 0.5 ? 0.0021 : 0.0036 + this.brake * 0.003;
     if (speed > 1e-3) {
       const dec = (mu * 9.81 * n.y + drag * speed * speed) * dt;
       vT.multiplyScalar(Math.max(0, speed - dec) / speed);
@@ -145,16 +145,44 @@ const Player = {
     else if (this.charge > 0) {
       const k = World.nearKicker(this.pos.x, this.pos.z);
       let pop = 3.2 + 2.6 * this.charge;
-      if (k) pop += 1.2; // a well-timed pop off the lip
-      this.vel.copy(vT).addScaledVector(n, pop);
+      let perfect = false;
+      const popDir = n.clone();
+      if (k) {
+        // on a kicker the ramp does the work; popping right at the edge of the lip adds a burst of speed and height
+        const u = (this.pos.x - k.x0) * k.dx + (this.pos.z - k.z0) * k.dz;
+        const toLip = k.len - u;
+        popDir.lerp(UP, 0.6).normalize();
+        if (toLip >= -0.2 && toLip < 1.8) { perfect = true; pop = 1.6 + this.charge * 0.8; vT.multiplyScalar(1.07); }
+        else pop = 0.6 + this.charge * 0.6;
+      }
+      this.vel.copy(vT).addScaledVector(popDir, pop);
       this.charge = 0;
       this.takeoff(true);
+      if (perfect) { this.air.perfect = true; this.emit('perfectPop', {}); }
       return;
     }
     this.carve = Math.abs(steer) * sstep(3, 12, speed);
     // integrate and follow the ground
     const prevY = this.pos.y;
+    const kOn = World.nearKicker(this.pos.x, this.pos.z);
+    const uPrev = kOn ? (this.pos.x - kOn.x0) * kOn.dx + (this.pos.z - kOn.z0) * kOn.dz : 0;
     this.pos.addScaledVector(vT, dt);
+    if (kOn) {
+      // leave the lip along the ramp's own angle (ground normals blur across the lip edge)
+      const uNew = (this.pos.x - kOn.x0) * kOn.dx + (this.pos.z - kOn.z0) * kOn.dz;
+      const L = kOn.len - 0.4;
+      if (uPrev < L && uNew >= L) {
+        const lat = -(this.pos.x - kOn.x0) * kOn.dz + (this.pos.z - kOn.z0) * kOn.dx;
+        const at = (u) => World.groundHeight(kOn.x0 + kOn.dx * u - kOn.dz * lat, kOn.z0 + kOn.dz * u + kOn.dx * lat);
+        const slope = (at(L) - at(L - 0.6)) / 0.6;
+        const sp = vT.length(), hx = vT.x, hz = vT.z, hl = Math.hypot(hx, hz) || 1;
+        const along = (hx * kOn.dx + hz * kOn.dz) / hl;
+        this.vel.set(hx / hl, slope * along, hz / hl).normalize().multiplyScalar(sp);
+        this.pos.y = at(uNew) + 0.02;
+        this.takeoff(false);
+        return;
+      }
+    }
     const h = World.groundHeight(this.pos.x, this.pos.z);
     if (h - this.pos.y > 0.45) {
       // a step too tall to ride up (a drop seen from below, a cliff band): treat it as a wall
@@ -171,7 +199,7 @@ const Player = {
     }
     const gap = this.pos.y - h;
     const needA = (2 * gap) / (dt * dt); // acceleration needed to stay on the ground
-    if ((gap > 0.035 && speed > 5) || (gap > 0.006 && needA > Math.max(20, 9.81 * n.y * 1.6))) {
+    if ((gap > 0.035 && speed > 1.5) || (gap > 0.006 && needA > Math.max(20, 9.81 * n.y * 1.6))) {
       // the ground fell away faster than we did: we're airborne
       this.vel.copy(vT);
       this.takeoff(false);
@@ -202,6 +230,7 @@ const Player = {
 
   takeoff(ollie) {
     this.ground = false;
+    this.coyote = ollie ? 0 : this.charge;
     this.air = {
       t: 0, yaw0: this.yaw, spin: 0, flipTot: 0, grabs: {}, grab: null, ollie, ride: this.ride, y0: this.pos.y,
       maxH: 0, n0: this.n.clone(), latchS: Input.steer(), latchF: Input.fwd(), kicker: !!World.nearKicker(this.pos.x - this.vel.x * 0.05, this.pos.z - this.vel.z * 0.05),
@@ -215,7 +244,16 @@ const Player = {
   stepAir(dt, steer, fb) {
     const A = this.air;
     A.t += dt;
-    this.vel.y -= 9.81 * dt;
+    // fall a little faster than you rise: jumps feel weighty without shortening the climb
+    this.vel.y -= 9.81 * (this.vel.y < 0 ? 1.4 : 1) * dt;
+    // released Space a moment after rolling off a lip: still counts as a pop
+    if (this.coyote > 0 && A.kicker && A.t < 0.14 && !Input.is('Space')) {
+      const vh = Math.hypot(this.vel.x, this.vel.z) || 1;
+      this.vel.x *= 1 + 0.06 * this.coyote; this.vel.z *= 1 + 0.06 * this.coyote;
+      this.vel.y += 1.2 + this.coyote * 0.7;
+      this.coyote = 0; A.perfect = true; A.ollie = true;
+      this.emit('perfectPop', {});
+    } else if (A.t >= 0.14) this.coyote = 0;
     const sp = this.vel.length();
     this.vel.multiplyScalar(1 - 0.0022 * sp * dt);
     // spin and flip with momentum
@@ -260,7 +298,9 @@ const Player = {
       const fr = wrapAngle(this.flip);
       if (!flipIn && Math.abs(fr) < 1.0) this.flip -= fr * Math.min(1, 8 * dt);
     }
-    if (this.pos.y <= h) { this.pos.y = h; this.land(); }
+    // leaving a kicker, ignore its own back wall; and you can't land while still rising
+    const hLand = A.kicker && A.t < 0.35 ? World.height(this.pos.x, this.pos.z) : h;
+    if (this.pos.y <= hLand && !(this.vel.y > 0.3 && A.t < 0.25 && this.pos.y > hLand - 0.6)) { this.pos.y = hLand; this.land(); }
   },
 
   land() {
@@ -279,7 +319,7 @@ const Player = {
     let reason = null;
     if (flipRes > 0.9) reason = 'Over-rotated';
     else if (mis > 0.95 && speedT > 3) reason = 'Caught an edge';
-    else if (hard > 17) reason = 'Flat landing';
+    else if (hard > 19) reason = 'Flat landing';
     if (reason) { this.vel.copy(vT).addScaledVector(n, vn * 0.3); return this.crash(reason); }
     // absorb: speed loss for sketchy landings, compression for big ones
     const sketch = mis > 0.45 || (A.grab && A.t > 0.4);
@@ -338,11 +378,11 @@ const Player = {
       const u = ex * g.dx + ez * g.dz;
       if (u < 0.2 || u > g.len - 0.4) continue;
       const v = -ex * g.dz + ez * g.dx;
-      if (Math.abs(v) > g.w + 0.4) continue;
+      if (Math.abs(v) > g.w + 0.75) continue;
       const top = lerp(g.ay, g.by, u / g.len);
       const along = this.vel.x * g.dx + this.vel.z * g.dz;
-      if (along < 1.5) continue;
-      if (this.pos.y > top - 0.3 && this.pos.y < top + 0.6 && (this.vel.y <= 0.5 || prev.y >= top - 0.1)) {
+      if (along < 1.2) continue;
+      if (this.pos.y > top - 0.45 && this.pos.y < top + 1.1 && (this.vel.y <= 1.0 || prev.y >= top - 0.15)) {
         this.startGrind(g, u, along);
         return true;
       }
@@ -370,7 +410,8 @@ const Player = {
     // closer to parallel → 50-50, closer to perpendicular → boardslide
     const slide = Math.abs(Math.sin(off)) > 0.6;
     const target = slide ? railYaw + Math.sign(Math.sin(off) || 1) * Math.PI / 2 : railYaw + (Math.abs(off) > Math.PI / 2 ? Math.PI : 0);
-    this.grind = { g, u, v: along, t: 0, slide, yawT: target, airBefore: this.air };
+    // balance: a needle that wanders off on its own; A and D push it back
+    this.grind = { g, u, v: along, t: 0, slide, yawT: target, airBefore: this.air, bal: (Math.random() - 0.5) * 0.5, balV: (Math.random() < 0.5 ? -1 : 1) * (0.5 + Math.random() * 0.7), good: 0, seed: Math.random() * 100, snap: 0 };
     this.air = null; this.ground = false;
     this.flip = 0; this.spinVel = 0;
     this.emit('grindStart', { kind: g.kind });
@@ -386,24 +427,43 @@ const Player = {
     const top = lerp(g.ay, g.by, G2.u / g.len);
     this.pos.set(g.ax + g.dx * G2.u, top, g.az + g.dz * G2.u);
     this.vel.set(g.dx * G2.v, -slope * G2.v, g.dz * G2.v);
-    this.edge = damp(this.edge, steer * 0.15, 6, dt);
-    this.crouch = damp(this.crouch, 0.35, 8, dt);
+    // the wobble grows the longer you stay on, and comes in irregular gusts
+    const t = G2.t + G2.seed;
+    const wob = Math.sin(t * 2.3) * 0.9 + Math.sin(t * 5.1 + 1.7) * 0.6 + Math.sin(t * 9.7 + 0.4) * 0.35 + (Math.random() - 0.5) * 3.2;
+    const push = -steer; // D moves the needle right, A left
+    G2.balV += (wob * (2.1 + G2.t * 0.6) + G2.bal * 2.4 + push * 6.8) * dt;
+    G2.balV *= Math.exp(-1.6 * dt);
+    G2.bal += G2.balV * dt;
+    if (Math.abs(G2.bal) < 0.35) G2.good += dt;
+    G2.snap = Math.min(1, G2.snap + dt * 6);
+    this.edge = damp(this.edge, G2.bal * 0.35, 10, dt);
+    this.crouch = damp(this.crouch, 0.35 + Math.abs(G2.bal) * 0.2, 8, dt);
     this.n.set(0, 1, 0);
     this.airUp.set(0, 1, 0);
-    const off = Input.hit('Space') || (Input.is('Space') && G2.t > 0.2);
+    if (Math.abs(G2.bal) > 1) {
+      // lost it: slip off the side the needle went
+      const sd = Math.sign(G2.bal);
+      this.vel.x += -g.dz * sd * 2.2; this.vel.z += g.dx * sd * 2.2; this.vel.y += 1.2;
+      this.endGrind(true);
+      return;
+    }
+    const off = Input.hit('Space');
     if (G2.u >= g.len || off) {
-      if (off) this.vel.y += 4;
+      if (off) { this.vel.y += 4.5; this.emit('railPop', {}); }
       this.endGrind();
     }
   },
-  endGrind() {
+  endGrind(fell = false) {
     const G2 = this.grind;
     this.grind = null;
     const name = (G2.slide ? 'Boardslide' : '50-50') + (G2.g.kind === 'box' ? ' (box)' : '');
     this.takeoff(false);
     this.air.ride = this.ride;
     this.air.fromGrind = true;
-    this.registerTrick(name, Math.round(150 + G2.t * 520 + G2.u * 18), false);
+    this.emit('grindEnd', { fell });
+    if (fell) { this.emit('lostBalance', {}); return; }
+    // time spent in the sweet spot of the balance bar is worth the most
+    this.registerTrick(name + (G2.good / Math.max(G2.t, 0.01) > 0.7 && G2.t > 0.6 ? ' · locked in' : ''), Math.round(150 + G2.t * 240 + G2.good * 620 + G2.u * 18), false);
   },
 
   // ---- obstacles ---------------------------------------------------------------

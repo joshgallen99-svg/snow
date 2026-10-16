@@ -112,6 +112,7 @@ kbd { display: inline-block; min-width: 18px; padding: 2px 7px; border-radius: 6
 #hud .clock { font-size: 13px; color: var(--muted); }
 #hud .bl { position: absolute; left: max(18px, env(safe-area-inset-left, 0px)); bottom: max(18px, env(safe-area-inset-bottom, 0px)); padding: 10px 16px; }
 #hud .speed { font-size: 40px; font-weight: 800; line-height: 1; }
+#hud .speed.fast { color: var(--amber); text-shadow: 0 0 18px rgba(242,177,74,.45); }
 #hud .speed small { font-size: 14px; font-weight: 600; color: var(--muted); margin-left: 4px; }
 #hud .alt { font-size: 13px; color: var(--muted); margin-top: 4px; }
 #hud .br { position: absolute; right: max(18px, env(safe-area-inset-right, 0px)); bottom: max(18px, env(safe-area-inset-bottom, 0px)); padding: 10px 14px; text-align: right; }
@@ -131,6 +132,14 @@ kbd { display: inline-block; min-width: 18px; padding: 2px 7px; border-radius: 6
 #msg .small { font-size: 16px; color: var(--text); opacity: .9; margin-top: 6px; }
 #msg.show { animation: msgIn .4s ease-out; }
 @keyframes msgIn { from { opacity: 0; transform: translate(-50%, -40%); } }
+#balance { position: absolute; left: 50%; bottom: max(22px, calc(env(safe-area-inset-bottom, 0px) + 22px)); transform: translateX(-50%); width: min(340px, calc(100vw - 48px)); padding: 10px 14px 12px; display: grid; gap: 8px; transition: opacity .12s; }
+#balance .bl-head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+#balance .bl-head kbd { margin: 0 2px; }
+#balance .bl-track { position: relative; height: 12px; border-radius: 999px; background: linear-gradient(90deg, rgba(255,107,94,.55) 0%, rgba(242,177,74,.35) 18%, rgba(255,255,255,.08) 34%, rgba(255,255,255,.08) 66%, rgba(242,177,74,.35) 82%, rgba(255,107,94,.55) 100%); box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
+#balance .bl-zone { position: absolute; left: 32.5%; right: 32.5%; top: 2px; bottom: 2px; border-radius: 999px; background: rgba(89,211,140,.28); box-shadow: inset 0 0 0 1px rgba(89,211,140,.6); transition: background .15s; }
+#balance.sweet .bl-zone { background: rgba(89,211,140,.5); }
+#balance .bl-needle { position: absolute; top: -5px; width: 4px; height: 22px; margin-left: -2px; border-radius: 3px; background: #fff; box-shadow: 0 0 0 2px rgba(15,26,44,.85), 0 0 12px rgba(255,255,255,.7); }
+#balance.danger .bl-needle { background: var(--bad); box-shadow: 0 0 0 2px rgba(15,26,44,.85), 0 0 14px rgba(255,107,94,.9); }
 #prompt { position: absolute; left: 50%; bottom: 26%; transform: translateX(-50%); padding: 10px 16px; font-weight: 600; }
 
 /* map UI */
@@ -269,7 +278,8 @@ kbd { display: inline-block; min-width: 18px; padding: 2px 7px; border-radius: 6
     <div><kbd>A</kbd><kbd>D</kbd> or <kbd>←</kbd><kbd>→</kbd></div><div>Carve left and right. In the air: spin.</div>
     <div><kbd>W</kbd> / <kbd>↑</kbd></div><div>Tuck for speed. In the air: frontflip. On flats: skate.</div>
     <div><kbd>S</kbd> / <kbd>↓</kbd></div><div>Skid to slow down. In the air: backflip.</div>
-    <div><kbd>Space</kbd></div><div>Hold to crouch, release to ollie. Pop right at a kicker lip for extra air. Jump off rails.</div>
+    <div><kbd>Space</kbd></div><div>Hold to crouch, release to ollie. Release right at the edge of a kicker lip for a perfect pop: more speed and height. Jump off rails.</div>
+    <div>Rails and boxes</div><div>Touch one and you snap on. Keep the balance needle near the middle with <kbd>A</kbd> and <kbd>D</kbd>: it wanders off on its own. Let it reach the edge and you slip off.</div>
     <div><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd><kbd>I</kbd></div><div>Grabs: Indy, Melon, Tail, Nose. Let go before you land.</div>
     <div><kbd>C</kbd></div><div>Slow motion with an orbit camera. Drag to look around, scroll to zoom.</div>
     <div><kbd>R</kbd></div><div>Respawn at your last safe spot.</div>
@@ -308,6 +318,10 @@ kbd { display: inline-block; min-width: 18px; padding: 2px 7px; border-radius: 6
   <div id="combo"></div>
   <div id="msg"></div>
   <div id="prompt" class="glass" hidden></div>
+  <div id="balance" class="glass" hidden aria-label="Rail balance">
+    <div class="bl-head"><span><kbd>A</kbd> lean</span><span>Balance</span><span>lean <kbd>D</kbd></span></div>
+    <div class="bl-track"><i class="bl-zone"></i><i class="bl-needle" id="balNeedle"></i></div>
+  </div>
 </div>
 
 <div id="mapUI" hidden>

@@ -5,7 +5,7 @@
 const Cam = {
   cam: null, mode: 'lodge', pose: { pos: new V3(), look: new V3(), fov: 60, roll: 0 },
   from: null, blendT: 1, blendDur: 0.8,
-  dir: new V3(0, 0, 1), shake: 0, cine: null, cineOn: true,
+  dir: new V3(0, 0, 1), shake: 0, cine: null, cineOn: false,
   orbit: { yaw: 0, pitch: 0.25, dist: 6 },
   look: new V3(),
 
@@ -28,11 +28,20 @@ const Cam = {
     const sp = vh.length();
     const want = sp > 2 ? vh.normalize() : new V3(Math.sin(pl.yaw) * pl.ride, 0, Math.cos(pl.yaw) * pl.ride);
     const a0 = Math.atan2(this.dir.x, this.dir.z), a1 = Math.atan2(want.x, want.z);
-    const a = dampAngle(a0, a1, pl.ground ? 3.2 : 1.2, dt);
+    // in the air the heading holds steady (spins don't swing the camera)
+    const a = dampAngle(a0, a1, pl.ground || pl.grind ? 3.2 : 0.6, dt);
     this.dir.set(Math.sin(a), 0, Math.cos(a));
     const speed = pl.vel.length();
-    const dist = 5.0 + speed * 0.075, height = 1.8 + speed * 0.025;
+    const fast = sstep(8, 30, speed);
+    // the camera tucks in lower and a little closer as you go faster
+    const dist = 5.2 + speed * 0.04, height = 1.9 - fast * 0.55;
+    // vertically, the camera rides a smoothed height in the air so it glides instead of bobbing
+    const airborne = !pl.ground && !pl.grind && !pl.crashed;
+    if (this.airY == null || !airborne) this.airY = pl.pos.y;
+    else this.airY = damp(this.airY, pl.pos.y, pl.vel.y < 0 ? 2.6 : 1.4, dt);
+    this.airK = damp(this.airK || 0, airborne ? 1 : 0, airborne ? 3 : 5, dt);
     const base = new V3().copy(pl.pos).add(new V3(0, 1.1, 0));
+    base.y = lerp(pl.pos.y, lerp(this.airY, pl.pos.y, 0.35), this.airK) + 1.1;
     out.pos.copy(base).addScaledVector(this.dir, -dist).add(new V3(0, height, 0));
     const gh = World.groundHeight(out.pos.x, out.pos.z) + 1.3;
     if (out.pos.y < gh) out.pos.y = gh;
@@ -52,9 +61,16 @@ const Cam = {
     const mid = new V3().lerpVectors(base, out.pos, 0.5);
     const mh = World.groundHeight(mid.x, mid.z) + 1.0;
     if (mid.y < mh) out.pos.y += (mh - mid.y) * 2;
-    out.look.copy(base).addScaledVector(this.dir, 3.5).addScaledVector(pl.vel, 0.12);
-    out.fov = 60 + sstep(5, 30, speed) * 17 + pl.tuck * 3;
-    out.roll = -pl.edge * 0.05 * pl.ride;
+    // look at the rider; in the air drift the aim toward where you'll come down
+    const lookAt = new V3().copy(pl.pos).add(new V3(0, 0.9, 0));
+    out.look.copy(lookAt).addScaledVector(this.dir, 3.5 * (1 - this.airK)).addScaledVector(pl.vel, 0.12 * (1 - this.airK));
+    if (this.airK > 0.01) out.look.addScaledVector(this.dir, 2.5 * this.airK).add(new V3(0, -0.6 * this.airK, 0));
+    // wide-angle rush at speed, plus a kick when you're accelerating hard
+    const acc = (speed - (this.lastSpeed ?? speed)) / Math.max(dt, 1e-3);
+    this.lastSpeed = speed;
+    this.accFov = damp(this.accFov || 0, clamp(acc * 0.9, -2, 6), 3, dt);
+    out.fov = 58 + Math.pow(fast, 1.3) * 30 + pl.tuck * 5 + (pl.ground ? this.accFov : 0);
+    out.roll = airborne ? 0 : -pl.edge * 0.06 * pl.ride;
     return out;
   },
   cinePose(pl, out) {
@@ -98,9 +114,10 @@ const Cam = {
     // smoothing: chase gets a spring so the camera lags a touch behind the action
     const cam = this.cam;
     if (!this.from && (m === 'chase')) {
-      cam.position.lerp(P.pos, 1 - Math.exp(-10 * dt));
-      this.look.lerp(P.look, 1 - Math.exp(-14 * dt));
-      cam.fov = damp(cam.fov, P.fov, 4, dt);
+      const air = this.airK || 0;
+      cam.position.lerp(P.pos, 1 - Math.exp(-lerp(10, 5, air) * dt));
+      this.look.lerp(P.look, 1 - Math.exp(-lerp(14, 7, air) * dt));
+      cam.fov = damp(cam.fov, P.fov, 3, dt);
     } else if (!this.from) {
       cam.position.lerp(P.pos, 1 - Math.exp(-(m === 'cine' ? 30 : 12) * dt));
       this.look.lerp(P.look, 1 - Math.exp(-(m === 'cine' ? 30 : 12) * dt));
@@ -115,7 +132,7 @@ const Cam = {
     }
     // shake: speed rumble + impact kicks
     this.shake = Math.max(0, this.shake - dt * 2.5);
-    const spd = ctx.player && m === 'chase' ? sstep(16, 32, ctx.player.speed) * 0.035 : 0;
+    const spd = ctx.player && m === 'chase' && ctx.player.ground ? sstep(12, 32, ctx.player.speed) * 0.07 : 0;
     const amp = spd + this.shake * 0.25;
     const t = U.uTime.value;
     const sx = (Math.sin(t * 37.1) + Math.sin(t * 23.3)) * amp, sy = (Math.sin(t * 41.7) + Math.cos(t * 29.1)) * amp;

@@ -53,7 +53,7 @@ const Post = {
           // radial speed blur toward the edges
           if (uSpeed > 0.01) {
             vec2 d = uv - 0.5; float r = length(d);
-            vec3 acc = col; float k = uSpeed * 0.028;
+            vec3 acc = col; float k = uSpeed * 0.045;
             for (int i = 1; i <= 7; i++) acc += texture2D(tScene, uv - d * k * float(i) / 7.0).rgb;
             col = mix(col, acc / 8.0, smoothstep(0.12, 0.55, r));
           }
@@ -80,9 +80,20 @@ const Post = {
               else if (outer > 0.5) col = vec3(0.0);
             }
           }
+          // speed lines rushing out from the centre
+          if (uSpeed > 0.02) {
+            vec2 d = uv - 0.5; d.x *= uRes.x / uRes.y;
+            float r = length(d), a = atan(d.y, d.x) / 6.2831853 + 0.5;
+            float bins = 110.0, b = floor(a * bins), hb = h(vec2(b, 7.0));
+            float thin = 1.0 - smoothstep(0.05, 0.16, abs(fract(a * bins) - 0.5));
+            float run = fract(r * 1.6 - uTime * (1.2 + hb * 2.2) + hb * 13.0);
+            float dash = smoothstep(0.0, 0.04, run) * (1.0 - smoothstep(0.18, 0.32, run));
+            float streak = thin * dash * step(0.62, hb) * smoothstep(0.3, 0.62, r) * pow(uSpeed, 1.4) * 0.32;
+            col = mix(col, vec3(1.0), streak);
+          }
           // vignette and film grain
           vec2 q = uv - 0.5;
-          col *= 1.0 - uVig * dot(q, q) * 1.8;
+          col *= 1.0 - (uVig + uSpeed * 0.3) * dot(q, q) * 1.8;
           col = toSRGB(clamp(col, 0.0, 1.0));
           col += (h(uv * uRes + fract(uTime) * 91.7) - 0.5) * 0.022;
           // letterbox for slow-mo

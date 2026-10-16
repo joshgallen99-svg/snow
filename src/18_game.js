@@ -9,8 +9,8 @@ const Game = {
 
   defaults() {
     return {
-      v: 2, done: {}, best: {}, tokens: [], gear: { board: 'blackout', jacket: 'onyx', pants: 'jet', helmet: 'black', goggles: 'red' },
-      settings: { music: 0.5, sfx: 0.8, quality: 'high', time: 'cycle', weather: 'auto', stance: 1, cine: true, ghost: false, unlockAll: false },
+      v: 3, done: {}, best: {}, tokens: [], gear: { board: 'blackout', jacket: 'onyx', pants: 'jet', helmet: 'black', goggles: 'red' },
+      settings: { music: 0.5, sfx: 0.8, quality: 'high', time: 'cycle', weather: 'auto', stance: 1, cine: false, ghost: false, unlockAll: false },
       ghosts: {},
     };
   },
@@ -27,6 +27,8 @@ const Game = {
       g.goggles = g.goggles || 'red';
       this.save.v = 2;
     }
+    // v3: the side-on jump camera is now off by default
+    if (this.save.v < 3) { this.save.settings.cine = false; this.save.v = 3; }
     this.save.settings = Object.assign(this.defaults().settings, (s && s.settings) || {});
     this.settings = this.save.settings;
     FX.collected = new Set(this.save.tokens);
@@ -406,7 +408,10 @@ const Game = {
         }
         Sound.brush();
       }
-      else if (e.type === 'grindStart') Sound.grind(true);
+      else if (e.type === 'grindStart') { Sound.grind(true); Cam.kick(0.15); }
+      else if (e.type === 'lostBalance') { UI.message('Lost your balance', '', 1100); Sound.bump(); }
+      else if (e.type === 'railPop') Sound.pop();
+      else if (e.type === 'perfectPop') { UI.trick({ name: 'Perfect pop', pts: 0, mult: 1, pop: true }); Sound.chime(7); Cam.kick(0.2); }
       else if (e.type === 'comboEnd' && e.n > 1) UI.toast(`Combo ×${e.n} banked · ${e.pts.toLocaleString()} points`, 1800);
       else if (e.type === 'comboLost' && e.pts > 0) UI.toast(`Combo lost (${e.pts.toLocaleString()})`, 1600);
     }
@@ -671,7 +676,7 @@ const Game = {
     Structures.update(rdt, Sky.night);
     Sky.update(rdt, this.cam, st === 'ride' || st === 'paused' ? Player.pos : this.cam.position.clone().setY(World.height(this.cam.position.x, this.cam.position.z)), st === 'map' ? 'map' : 'ride');
     this.updateLamps();
-    if (st === 'ride') { FX.boardSpray(dt, Player); FX.trailUpdate(Player); }
+    if (st === 'ride') { FX.boardSpray(dt, Player); FX.trailUpdate(Player); this.speedMotes(dt); }
     if (st === 'ride' || st === 'title' || st === 'locker' || st === 'lift') FX.emitAmbient(dt, this.cam, Sky.night, Sky.weather.wind);
     FX.update(dt);
     FX.light.value.copy(Sky.hemi.color).multiplyScalar(Sky.hemi.intensity).add(new THREE.Color(Sky.sun.color).multiplyScalar(Sky.sun.intensity * 0.3));
@@ -694,13 +699,26 @@ const Game = {
     if (Structures.metalMat.envMap) Structures.metalMat.envMapIntensity = 0.45 * envK;
     Post.uni.uExposure.value = Sky.exposure;
     Post.uni.uBloom.value = this.settings.quality === 'low' ? 0 : lerp(0.22, 0.65, Sky.night);
-    Post.uni.uSpeed.value = damp(Post.uni.uSpeed.value, st === 'ride' && !Player.crashed ? sstep(17, 32, Player.speed) : 0, 4, rdt);
+    Post.uni.uSpeed.value = damp(Post.uni.uSpeed.value, st === 'ride' && !Player.crashed ? sstep(11, 30, Player.speed) : 0, 4, rdt);
     Post.uni.uLetter.value = damp(Post.uni.uLetter.value, this.slowmo || st === 'lift' ? 1 : 0, 5, rdt);
     Post.uni.uSat.value = this.slowmo ? 0.85 : 1.08;
     Post.uni.uGrade.value = 1 - Sky.night;
     const hov = st === 'map' ? (MapView.hover >= 0 ? MapView.hover : MapView.selected) : -1;
     Post.render(this.scene, this.cam, hov >= 0 ? Structures.lifts[hov].layer : null);
     Input.endFrame();
+  },
+  // ice crystals hanging in the air ahead: they whip past the lens at speed
+  speedMotes(dt) {
+    const sp = Player.speed, rate = sstep(7, 30, sp) * 110 * dt;
+    if (rate <= 0 || Player.crashed) return;
+    const c = this.cam, f = new V3(), r = new V3(), u = new V3();
+    c.getWorldDirection(f); r.crossVectors(f, UP).normalize(); u.crossVectors(r, f);
+    let n = Math.floor(rate) + (Math.random() < rate % 1 ? 1 : 0);
+    while (n-- > 0) {
+      const d = 5 + Math.random() * 20, x = (Math.random() - 0.5) * 16, y = (Math.random() - 0.4) * 7;
+      const p = new V3().copy(c.position).addScaledVector(f, d).addScaledVector(r, x).addScaledVector(u, y);
+      FX.spawn(p.x, p.y, p.z, Sky.weather.wind * 1.5, -0.2, 0, 1.1, 0.05, 0.05, 0.55, 1, 1, 1, 0.01, 0.2);
+    }
   },
   drawIdle(dt) {
     const m = this.rider, p = this.lodgeSpot;
