@@ -242,7 +242,11 @@ const TerrainMesh = {
         col = mix(col, vec3(0.62, 0.68, 0.74), forestA * 0.35 * (1.0 - far));
         float litter = step(0.93, th(floor(vWPos.xz * 7.0))) * smoothstep(0.25, 0.7, forestA) * (1.0 - smoothstep(8.0, 30.0, camD)) * (1.0 - clamp(vComp, 0.0, 1.0));
         col = mix(col, vec3(0.28, 0.22, 0.18), litter * 0.55);
-        col = mix(col, vec3(0.05, 0.09, 0.09), clamp(forestA * 1.25, 0.0, 1.0) * (0.1 + 0.78 * far) * (1.0 - rock));
+        // from afar a forest is a speckle of dark firs and grey-brown bare birch over the snow
+        float stand = vnoise(vWPos.xz * 0.045) * 0.6 + vnoise(vWPos.xz * 0.19) * 0.4;
+        vec3 woodC = mix(vec3(0.035, 0.06, 0.065), vec3(0.2, 0.2, 0.235), smoothstep(0.5, 0.8, vnoise(vWPos.xz * 0.008 + 9.0)) * 0.8);
+        float dens = clamp(forestA * 1.3, 0.0, 1.0) * (0.75 + 0.5 * stand);
+        col = mix(col, woodC, clamp(dens, 0.0, 0.97) * (0.1 + 0.86 * far) * (1.0 - rock));
         // plowed roads
         float tracks = smoothstep(0.35, 0.5, abs(fract(q * 0.45) - 0.5));
         col = mix(col, mix(vec3(0.42, 0.42, 0.43), vec3(0.30, 0.30, 0.31), tracks * 0.7), roadA);

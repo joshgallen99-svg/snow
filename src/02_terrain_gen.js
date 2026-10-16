@@ -74,7 +74,14 @@ function baseCoarse(x, z) {
   h += fbm(noiseB, x / 140, z / 140, 3) * (1.8 + 7 * alt);
   // beyond the resort: rolling forested hills and the far side of the valley
   const out = sstep(1300, 2600, Math.max(Math.abs(x), Math.abs(z) - (z > 0 ? 300 : 0)));
-  if (out > 0) h += out * ((fbm(noiseA, x / 1100 + 5, z / 1100, 4) * 0.5 + 0.5) * 230 + (ridged(noiseC, x / 520 + 3, z / 520, 4) - 0.4) * 150) + sstep(2400, 5200, z) * 180;
+  if (out > 0) {
+    // broad hill masses with branching ridges on top, and flat farmland and river flats between them
+    const wx2 = x + 400 * noiseB(x / 2600 + 1, z / 2600), wz2 = z + 400 * noiseB(x / 2600 + 7, z / 2600 + 2);
+    const mass = Math.pow(fbm(noiseA, wx2 / 2300 + 5, wz2 / 2300, 4) * 0.5 + 0.5, 1.6);
+    const ridge = ridged(noiseC, wx2 / 1500 + 3, wz2 / 1500, 5) - 0.42;
+    const hill = Math.max(0, mass * 420 + ridge * 190 * (0.4 + mass) - 70);
+    h += out * (hill + sstep(2400, 5200, z) * 160);
+  }
   return h + 35;
 }
 function baseFine(x, z, h) {
