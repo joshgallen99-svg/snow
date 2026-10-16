@@ -62,12 +62,14 @@ Sources live in `src/` and are concatenated in filename order into `src/template
 | `05_geo.js` | Low-poly geometry builder, shared shader patches |
 | `06_terrain_mesh.js` | LOD terrain chunks and the snow shader |
 | `07_vegetation.js` | Instanced trees with near/far LOD, rocks |
-| `08_structures.js` | Lifts, buildings, park features, signs, river |
+| `08_structures.js` | Lifts, buildings, park features, logs, signs, river |
+| `08b_lights.js` | Every light: lanterns, floods, festoons, beacons, glows, beams, ground pools |
 | `09_rider.js` | Procedural rider rig and ragdoll |
 | `10_physics.js` | Input and rider physics, tricks, grinds, crashes |
 | `11_sky.js` | Sky dome, day cycle, weather, snowfall, distant ranges |
 | `12_fx.js` | Particles, snow trail, tokens, glows |
 | `12b_snow.js` | The deformable fresh-snow layer and its compaction map |
+| `12c_people.js` | Other skiers and riders on the runs, passengers on the lifts |
 | `13_audio.js` | Synthesized sound effects and lo-fi music |
 | `14_camera.js` | Camera modes and blending |
 | `15_post.js` | HDR target, lift outline, speed blur, grading |
@@ -81,6 +83,8 @@ Headless checks (Node 22, Playwright with the bundled Chromium):
 node tools/test_terrain.mjs   # run grades, cut/fill, writes a hillshade to tools/map.png
 node tools/test_physics.mjs   # autopilot rides every run top to bottom
 node tools/test_tricks.mjs    # butters, presses, switch-ups, spin-ons, combo grabs, corks
+node tools/test_rocks.mjs     # riding into and over rocks of every size
+node tools/test_cam.mjs       # chase camera never blocked, rider framed through every kicker air
 node tools/scene.mjs '[["run","summitbowl",300,16],["sim",1],["shot","powder"]]'   # stepped scene screenshots
 node tools/shot.mjs "title||3000" "map|Game.openMap()|5000"   # screenshots to tools/out/
 ```
