@@ -4228,8 +4228,8 @@ const Player = {
     speed = vT.length();
     // deep snow bogs you down when slow and lets you plane on top when fast
     const bog = 1 + 0.9 * (1 - sstep(4, 15, speed));
-    const mu = lerp(lerp(0.055, 0.035, S.groom), 0.1 * bog, S.powder * (1 - S.groom)) + S.road * 0.6;
-    const drag = this.tuck > 0.5 ? 0.0021 : 0.0036 + this.brake * 0.003;
+    const mu = lerp(lerp(0.046, 0.029, S.groom), 0.088 * bog, S.powder * (1 - S.groom)) + S.road * 0.6;
+    const drag = this.tuck > 0.5 ? 0.0018 : 0.0031 + this.brake * 0.003;
     if (speed > 1e-3) {
       const dec = (mu * 9.81 * n.y + drag * speed * speed) * dt;
       vT.multiplyScalar(Math.max(0, speed - dec) / speed);
@@ -4752,8 +4752,9 @@ const Player = {
 // ============================================================================
 const PALETTE = [
   // e = sin(sun elevation)
-  { e: -0.35, zen: 0x040814, hor: 0x111a33, sun: 0x8ea4d8, si: 0.32, hs: 0x2a3a60, hg: 0x0c1220, hi: 0.55, fog: 0x0f1729, exp: 1.25 },
-  { e: -0.1,  zen: 0x0b1530, hor: 0x2b3a66, sun: 0x9fb2e0, si: 0.3,  hs: 0x3a4a78, hg: 0x141a2c, hi: 0.6,  fog: 0x2a3658, exp: 1.2 },
+  // night: moonlit snow stays readable, blue and bright enough to ride by
+  { e: -0.35, zen: 0x0a1328, hor: 0x1f2c50, sun: 0x9fb4e6, si: 0.32, hs: 0x5468a0, hg: 0x283350, hi: 1.0,  fog: 0x1c2846, exp: 1.65 },
+  { e: -0.1,  zen: 0x13204a, hor: 0x3a4c80, sun: 0xa8bae6, si: 0.3,  hs: 0x5a6ca2, hg: 0x2a3250, hi: 0.95, fog: 0x34426c, exp: 1.45 },
   { e: 0.0,   zen: 0x27407a, hor: 0xf08a6a, sun: 0xff9a6b, si: 0.9,  hs: 0x7a86b8, hg: 0x40384a, hi: 0.7,  fog: 0xc99086, exp: 1.05 },
   { e: 0.1,   zen: 0x3a68b8, hor: 0xffbf8e, sun: 0xffb070, si: 2.3,  hs: 0x98aed8, hg: 0x6a6270, hi: 0.78, fog: 0xe8c2a4, exp: 0.95 },
   // golden hour: low warm sun, cool blue shadows
@@ -4762,7 +4763,7 @@ const PALETTE = [
   { e: 0.9,   zen: 0x2f6fd8, hor: 0xbcd6f4, sun: 0xfff8ef, si: 3.2,  hs: 0xc2d8f6, hg: 0x929eb4, hi: 0.95, fog: 0xbfd3ec, exp: 0.85 },
 ];
 const OVERCAST = { zen: 0x9aa6b4, hor: 0xc9d0d8, fog: 0xc4cbd3, hs: 0xc2cad4, hg: 0x9aa2ae };
-const OVERCAST_NIGHT = { zen: 0x10141c, hor: 0x1e2430, fog: 0x1c222c, hs: 0x343c4a, hg: 0x161a22 };
+const OVERCAST_NIGHT = { zen: 0x161c28, hor: 0x2a3242, fog: 0x2a3242, hs: 0x4c5668, hg: 0x262c38 };
 
 const Sky = {
   time: 9.2, dayLength: 24 * 60, cycle: true,
@@ -5038,7 +5039,7 @@ const Sky = {
     const useMoon = e < -0.04;
     const ldir = useMoon ? this.moonDir : this.sunDir;
     this.sun.color.copy(useMoon ? new THREE.Color(0x9db0e0) : sunC);
-    this.sun.intensity = useMoon ? 0.42 * (1 - ov * 0.7) * sstep(0.0, 0.25, this.moonDir.y) : si * sstep(-0.04, 0.04, e);
+    this.sun.intensity = useMoon ? 0.9 * (1 - ov * 0.6) * sstep(0.0, 0.25, this.moonDir.y) : si * sstep(-0.04, 0.04, e);
     this.sun.position.copy(focus).addScaledVector(ldir, 420);
     this.sun.target.position.copy(focus);
     // snap the shadow camera to texels so shadows don't swim

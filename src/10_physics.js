@@ -148,8 +148,8 @@ const Player = {
     speed = vT.length();
     // deep snow bogs you down when slow and lets you plane on top when fast
     const bog = 1 + 0.9 * (1 - sstep(4, 15, speed));
-    const mu = lerp(lerp(0.055, 0.035, S.groom), 0.1 * bog, S.powder * (1 - S.groom)) + S.road * 0.6;
-    const drag = this.tuck > 0.5 ? 0.0021 : 0.0036 + this.brake * 0.003;
+    const mu = lerp(lerp(0.046, 0.029, S.groom), 0.088 * bog, S.powder * (1 - S.groom)) + S.road * 0.6;
+    const drag = this.tuck > 0.5 ? 0.0018 : 0.0031 + this.brake * 0.003;
     if (speed > 1e-3) {
       const dec = (mu * 9.81 * n.y + drag * speed * speed) * dt;
       vT.multiplyScalar(Math.max(0, speed - dec) / speed);
