@@ -709,7 +709,7 @@ const Game = {
     if (st === 'ride') { FX.boardSpray(dt, Player); FX.railSpray(dt, Player); FX.trailUpdate(Player); this.speedMotes(dt); }
     if (st === 'ride' || st === 'title' || st === 'locker' || st === 'lift') FX.emitAmbient(dt, this.cam, Sky.night, Sky.weather.wind);
     FX.update(dt);
-    FX.updateLight(this.cam);
+    FX.updateLight(this.cam, st === 'ride' && !Player.crashed ? Player.pos : null);
     Lights.update(st === 'ride' || st === 'paused' ? Player.pos : this.cam.position, this.cam, U.uLampOn.value, clamp(Sky.weather.snow * 1.2 + Sky.weather.overcast * 0.25, 0, 1.2), this.glowPx || 1, this.frame);
     if (st !== 'ride') FX.updateTokens(U.uTime.value, null, () => {});
     TerrainMesh.update(this.cam);
