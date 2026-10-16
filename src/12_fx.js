@@ -33,7 +33,9 @@ const FX = {
         void main(){ vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mvPosition;
           float px = aSize * uPx * 420.0 / max(0.3, -mvPosition.z);
           // sub-pixel specks fade out instead of flickering
-          vA = aAlpha * clamp(px / 2.0, 0.0, 1.0); gl_PointSize = max(px, 1.5);
+          vA = aAlpha * clamp(px / 2.0, 0.0, 1.0) * smoothstep(1.2, 5.5, -mvPosition.z); gl_PointSize = max(px, 1.5);
+          // big puffs right in front of the lens would white out the view: fade those harder
+          vA *= 1.0 - smoothstep(60.0, 260.0, px) * 0.75;
           if (aAlpha <= 0.0) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
           vC = aCol; vM = aMisc;
           #include <fog_vertex>
@@ -243,7 +245,7 @@ const FX = {
       const big = Math.random() < 0.6;
       if (big) {
         this.spawn(ex, y + 0.15, ez, pl.vel.x * 0.18 + lx * side * 2 + wind * 0.8, 1.6 + Math.random() * 2.2 + sp * 0.07, pl.vel.z * 0.18 + lz * side * 2,
-          1.6 + Math.random() * 1.6, 0.4, 1.8 + Math.random() * 1.6 + sp * 0.04, 0.34, 1, 1, 1, 0.05, 1.3, 0, 1, 0);
+          1.6 + Math.random() * 1.6, 0.4, 1.6 + Math.random() * 1.4 + sp * 0.035, 0.27, 1, 1, 1, 0.05, 1.3, 0, 1, 0);
       } else {
         // clumps thrown higher that fall back out of the cloud
         this.spawn(ex, y + 0.12, ez, pl.vel.x * 0.35 + lx * side * 3, 2.5 + Math.random() * 3.5 + sp * 0.08, pl.vel.z * 0.35 + lz * side * 3,

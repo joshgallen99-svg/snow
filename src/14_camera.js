@@ -42,6 +42,9 @@ const Cam = {
     else this.camY = damp(this.camY, pl.pos.y, 6, dt);
     const base = new V3(pl.pos.x, this.camY + 1.1, pl.pos.z);
     out.pos.copy(base).addScaledVector(this.dir, -dist).add(new V3(0, height, 0));
+    // stay well above the snow (the fresh layer can be 60 cm deep), uphill of the rider included
+    const gh = World.groundHeight(out.pos.x, out.pos.z) + 1.5;
+    if (out.pos.y < gh) out.pos.y = gh;
     // look at the rider; on the ground lead the aim down the hill, in the air aim a little toward the landing
     const lookAt = new V3().copy(pl.pos).add(new V3(0, 0.9, 0));
     out.look.copy(lookAt).addScaledVector(this.dir, 3.5 * (1 - this.airK)).addScaledVector(pl.vel, 0.12 * (1 - this.airK));
@@ -67,7 +70,7 @@ const Cam = {
     for (let k = 1; k <= n; k++) {
       const t = k / n;
       p.lerpVectors(a, b, t);
-      if (p.y < World.groundHeight(p.x, p.z) + 0.45) return t;
+      if (p.y < World.groundHeight(p.x, p.z) + 0.8) return t;
       // whatever the rider is brushing past right now doesn't count
       if (t * len < 1.6) continue;
       for (const c of this._cc) {

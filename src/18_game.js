@@ -211,8 +211,22 @@ const Game = {
       // look a little to the right of the rider so they stand clear of the locker panel
       return { pos: r.clone().addScaledVector(o, 4.3).add(new V3(0, 1.45, 0)), look: r.clone().add(new V3(0, 0.85, 0)).addScaledVector(right, innerWidth > 800 ? 1.25 : 0), fov: 42 };
     }
+    // pick a spot once with a clear view up the mountain (no hotel wall in the way)
+    if (!this._lodgeCam) {
+      const look = new V3(b.x, b.y, b.z).addScaledVector(toPeak, 260).add(new V3(0, 120, 0));
+      let best = null;
+      for (const [back, sd, up] of [[-70, 46, 14], [-70, -46, 14], [-50, 70, 20], [-50, -70, 20], [-90, 30, 26], [-90, -30, 26], [-40, 0, 34], [-120, 60, 40]]) {
+        const pos = new V3(b.x, b.y, b.z).addScaledVector(toPeak, back).addScaledVector(side, sd).add(new V3(0, up, 0));
+        const near = new V3().lerpVectors(pos, look, 0.4);
+        let ok = Cam.blockedAt(pos, near) >= 1;
+        for (const sw of [-18, 18]) ok = ok && Cam.blockedAt(pos.clone().addScaledVector(side, sw), near) >= 1;
+        if (ok) { best = { back, sd, up }; break; }
+      }
+      this._lodgeCam = best || { back: -70, sd: 46, up: 30 };
+    }
+    const L = this._lodgeCam;
     const sway = Math.sin(t * 0.05) * 18;
-    const pos = new V3(b.x, b.y, b.z).addScaledVector(toPeak, -70).addScaledVector(side, 46 + sway).add(new V3(0, 14, 0));
+    const pos = new V3(b.x, b.y, b.z).addScaledVector(toPeak, L.back).addScaledVector(side, L.sd + sway).add(new V3(0, L.up, 0));
     const look = new V3(b.x, b.y, b.z).addScaledVector(toPeak, 260).add(new V3(0, 120, 0));
     return { pos, look, fov: 50 };
   },
@@ -402,9 +416,9 @@ const Game = {
       } else if (e.type === 'bump') { if (e.into > 2) Sound.bump(); }
       else if (e.type === 'brush') {
         // snow shaken off the branches falls around you
-        const t = e.tree, n = t.type ? 14 : 34;
+        const t = e.tree, n = t.type === 1 ? 14 : 34;
         for (let k = 0; k < n; k++) {
-          const a = Math.random() * TAU, r = Math.random() * (t.type ? 1.2 : 2.2) * t.s, h = t.y + (1.5 + Math.random() * 6) * t.s;
+          const a = Math.random() * TAU, r = Math.random() * (t.type === 1 ? 1.2 : 2.2) * t.s, h = t.y + (1.5 + Math.random() * 6) * t.s;
           const clump = Math.random() < 0.45;
           if (clump) FX.spawn(t.x + Math.cos(a) * r, h, t.z + Math.sin(a) * r, Player.vel.x * 0.1, -0.5 - Math.random(), Player.vel.z * 0.1, 2.5, 0.09 + Math.random() * 0.08, 0.07, 1, 1, 1, 1, 1, 0.4, 1, 1, 1);
           else FX.spawn(t.x + Math.cos(a) * r, h, t.z + Math.sin(a) * r, Player.vel.x * 0.1, -0.5 - Math.random(), Player.vel.z * 0.1, 1.6 + Math.random(), 0.25, 1.5, 0.5, 1, 1, 1, 0.5, 1.4);

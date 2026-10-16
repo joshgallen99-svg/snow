@@ -1601,12 +1601,14 @@ const Scatter = {
         World.normal(px, pz, nrm);
         if (nrm.y < 0.72) continue; // too steep for trees
         const birchBias = sstep(400, 120, h) * 0.75 + 0.18 * noiseC(px / 120, pz / 120);
-        const type = r1 < birchBias ? 1 : 0;
+        let type = r1 < birchBias ? 1 : 0;
         const nearTreeline = sstep(430, 590, h);
+        // up near the treeline the wind plasters firs in rime until they're snow monsters (juhyo)
+        if (type === 0 && rnd() < sstep(470, 560, h) * 0.85) type = 2;
         const s = (type ? 0.85 + r2 * 0.5 : 0.75 + r2 * 0.75) * (1 - nearTreeline * 0.55);
         const t = { x: px, z: pz, y: h - 0.2, s, rot: r3 * TAU, type, tint: r2 };
         this.trees.push(t);
-        World.addCollider(px, pz, type ? 0.35 * s + 0.25 : 0.5 * s + 0.35, h + 8 * s, 'tree', t);
+        World.addCollider(px, pz, type === 1 ? 0.35 * s + 0.25 : type === 2 ? 0.9 * s + 0.4 : 0.5 * s + 0.35, h + 8 * s, 'tree', t);
       }
     }
   },
@@ -2286,6 +2288,27 @@ const Vegetation = {
     });
     return b.build();
   },
+  // a fir buried in rime: lumpy white blobs leaning downwind, a little green showing through
+  monsterGeometry(lod) {
+    const b = new GeoBuilder({ smooth: true });
+    const rime = 0xeef3f8, blue = 0xdbe5ef, green = 0x2a4a35;
+    const rnd = mulberry32(lod ? 3 : 4);
+    if (lod === 1) {
+      b.add(G.ico(1, 1), { y: 3.4, sx: 1.9, sy: 3.6, sz: 1.8, color: rime });
+      return b.build();
+    }
+    const blobs = [[2.0, 1.1], [1.8, 2.3], [1.55, 3.4], [1.3, 4.4], [1.05, 5.3], [0.75, 6.1], [0.45, 6.7]];
+    blobs.forEach(([r, y], i) => {
+      const lean = i * 0.12;
+      for (let k = 0; k < 2; k++) {
+        const a = rnd() * TAU, o = r * 0.25;
+        b.add(G.ico(1, 1), { x: lean + Math.cos(a) * o, y, z: Math.sin(a) * o, sx: r, sy: r * 0.72, sz: r * 0.92, ry: rnd() * TAU, color: (i + k) % 3 ? rime : blue });
+      }
+      // needles peeking out on the sheltered side
+      if (i > 0 && i < 5) b.add(G.cone(r * 0.6, 0.7, 6), { x: lean - r * 0.75, y: y - 0.35, z: (rnd() - 0.5) * r, rz: 0.5, color: green });
+    });
+    return b.build();
+  },
   birchGeometry(lod) {
     const b = new GeoBuilder();
     const bark = 0xe9e5dc, mark = 0x3b3631, twig = 0x7d6c68;
@@ -2443,19 +2466,19 @@ const Vegetation = {
   init(scene) {
     this.group = new THREE.Group(); this.group.name = 'vegetation';
     scene.add(this.group);
-    const geoNear = [this.firGeometry(0), this.birchGeometry(0)];
-    const geoFar = [this.firGeometry(1), this.crossedPlanes(2, 0, 12.8, 6.4)];
+    const geoNear = [this.firGeometry(0), this.birchGeometry(0), this.monsterGeometry(0)];
+    const geoFar = [this.firGeometry(1), this.crossedPlanes(2, 0, 12.8, 6.4), this.monsterGeometry(1)];
     const matNear = this.lodMaterial(true), matFar = this.lodMaterial(false), depth = this.depthMaterial();
     const crownGeo = this.crossedPlanes(3, 0, 12.8, 6.4);
     const crownNear = this.crownMaterial(this.birchTexture(false), true);
     const crownFar = this.crownMaterial(this.birchTexture(true), false);
     const TS = 256, nt = Math.ceil((WORLD.half * 2) / TS);
     const buckets = new Map();
-    const byType = [[], []];
+    const byType = [[], [], []];
     for (const t of Scatter.trees) {
       byType[t.type].push(t);
       const key = Math.floor((t.x + WORLD.half) / TS) * 100 + Math.floor((t.z + WORLD.half) / TS);
-      let b = buckets.get(key); if (!b) buckets.set(key, (b = [[], []]));
+      let b = buckets.get(key); if (!b) buckets.set(key, (b = [[], [], []]));
       b[t.type].push(t);
     }
     const tint = new THREE.Color();
@@ -2464,7 +2487,7 @@ const Vegetation = {
         _m4.compose(_v.set(t.x, t.y, t.z), _q.setFromAxisAngle(_v2.set(0, 1, 0), t.rot), _s.set(t.s, t.s * (0.9 + t.tint * 0.25), t.s));
         mesh.setMatrixAt(i, _m4);
         const k = 0.86 + t.tint * 0.24;
-        mesh.setColorAt(i, tint.setRGB(k, k * (t.type ? 0.98 : 1.0), k));
+        mesh.setColorAt(i, t.type === 2 ? tint.setRGB(0.97 + t.tint * 0.03, 0.98, 1) : tint.setRGB(k, k * (t.type ? 0.98 : 1.0), k));
       });
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
@@ -2473,7 +2496,7 @@ const Vegetation = {
     for (const [key, b] of buckets) {
       const tx = Math.floor(key / 100), tz = key % 100;
       const tile = { cx: -WORLD.half + (tx + 0.5) * TS, cz: -WORLD.half + (tz + 0.5) * TS, meshes: [] };
-      for (let type = 0; type < 2; type++) {
+      for (let type = 0; type < 3; type++) {
         if (!b[type].length) continue;
         const m = new THREE.InstancedMesh(geoNear[type], matNear, b[type].length);
         setInst(m, b[type]);
@@ -2489,8 +2512,9 @@ const Vegetation = {
       }
       this.tiles.push(tile);
     }
-    for (let type = 0; type < 2; type++) {
-      const m = new THREE.InstancedMesh(geoFar[type], type ? crownFar.mat : matFar, byType[type].length);
+    for (let type = 0; type < 3; type++) {
+      if (!byType[type].length) continue;
+      const m = new THREE.InstancedMesh(geoFar[type], type === 1 ? crownFar.mat : matFar, byType[type].length);
       setInst(m, byType[type]);
       m.receiveShadow = false;
       this.group.add(m); this.far.push(m);
@@ -4662,7 +4686,7 @@ const Player = {
       if (c.kind === 'rock') continue;
       // brushing through low fir branches knocks their snow loose
       if (c.kind === 'tree' && c.ref) {
-        const t = c.ref, canopy = t.s * (t.type ? 1.0 : 1.9) + R;
+        const t = c.ref, canopy = t.s * (t.type === 1 ? 1.0 : 1.9) + R;
         const dc = Math.hypot(p.x - c.x, p.z - c.z);
         if (dc < canopy && this.speed > 3 && this.time - (t.brushT || -9) > 1.6) {
           t.brushT = this.time;
@@ -5078,7 +5102,9 @@ const FX = {
         void main(){ vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mvPosition;
           float px = aSize * uPx * 420.0 / max(0.3, -mvPosition.z);
           // sub-pixel specks fade out instead of flickering
-          vA = aAlpha * clamp(px / 2.0, 0.0, 1.0); gl_PointSize = max(px, 1.5);
+          vA = aAlpha * clamp(px / 2.0, 0.0, 1.0) * smoothstep(1.2, 5.5, -mvPosition.z); gl_PointSize = max(px, 1.5);
+          // big puffs right in front of the lens would white out the view: fade those harder
+          vA *= 1.0 - smoothstep(60.0, 260.0, px) * 0.75;
           if (aAlpha <= 0.0) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
           vC = aCol; vM = aMisc;
           #include <fog_vertex>
@@ -5288,7 +5314,7 @@ const FX = {
       const big = Math.random() < 0.6;
       if (big) {
         this.spawn(ex, y + 0.15, ez, pl.vel.x * 0.18 + lx * side * 2 + wind * 0.8, 1.6 + Math.random() * 2.2 + sp * 0.07, pl.vel.z * 0.18 + lz * side * 2,
-          1.6 + Math.random() * 1.6, 0.4, 1.8 + Math.random() * 1.6 + sp * 0.04, 0.34, 1, 1, 1, 0.05, 1.3, 0, 1, 0);
+          1.6 + Math.random() * 1.6, 0.4, 1.6 + Math.random() * 1.4 + sp * 0.035, 0.27, 1, 1, 1, 0.05, 1.3, 0, 1, 0);
       } else {
         // clumps thrown higher that fall back out of the cloud
         this.spawn(ex, y + 0.12, ez, pl.vel.x * 0.35 + lx * side * 3, 2.5 + Math.random() * 3.5 + sp * 0.08, pl.vel.z * 0.35 + lz * side * 3,
@@ -6124,6 +6150,9 @@ const Cam = {
     else this.camY = damp(this.camY, pl.pos.y, 6, dt);
     const base = new V3(pl.pos.x, this.camY + 1.1, pl.pos.z);
     out.pos.copy(base).addScaledVector(this.dir, -dist).add(new V3(0, height, 0));
+    // stay well above the snow (the fresh layer can be 60 cm deep), uphill of the rider included
+    const gh = World.groundHeight(out.pos.x, out.pos.z) + 1.5;
+    if (out.pos.y < gh) out.pos.y = gh;
     // look at the rider; on the ground lead the aim down the hill, in the air aim a little toward the landing
     const lookAt = new V3().copy(pl.pos).add(new V3(0, 0.9, 0));
     out.look.copy(lookAt).addScaledVector(this.dir, 3.5 * (1 - this.airK)).addScaledVector(pl.vel, 0.12 * (1 - this.airK));
@@ -6149,7 +6178,7 @@ const Cam = {
     for (let k = 1; k <= n; k++) {
       const t = k / n;
       p.lerpVectors(a, b, t);
-      if (p.y < World.groundHeight(p.x, p.z) + 0.45) return t;
+      if (p.y < World.groundHeight(p.x, p.z) + 0.8) return t;
       // whatever the rider is brushing past right now doesn't count
       if (t * len < 1.6) continue;
       for (const c of this._cc) {
@@ -7212,8 +7241,22 @@ const Game = {
       // look a little to the right of the rider so they stand clear of the locker panel
       return { pos: r.clone().addScaledVector(o, 4.3).add(new V3(0, 1.45, 0)), look: r.clone().add(new V3(0, 0.85, 0)).addScaledVector(right, innerWidth > 800 ? 1.25 : 0), fov: 42 };
     }
+    // pick a spot once with a clear view up the mountain (no hotel wall in the way)
+    if (!this._lodgeCam) {
+      const look = new V3(b.x, b.y, b.z).addScaledVector(toPeak, 260).add(new V3(0, 120, 0));
+      let best = null;
+      for (const [back, sd, up] of [[-70, 46, 14], [-70, -46, 14], [-50, 70, 20], [-50, -70, 20], [-90, 30, 26], [-90, -30, 26], [-40, 0, 34], [-120, 60, 40]]) {
+        const pos = new V3(b.x, b.y, b.z).addScaledVector(toPeak, back).addScaledVector(side, sd).add(new V3(0, up, 0));
+        const near = new V3().lerpVectors(pos, look, 0.4);
+        let ok = Cam.blockedAt(pos, near) >= 1;
+        for (const sw of [-18, 18]) ok = ok && Cam.blockedAt(pos.clone().addScaledVector(side, sw), near) >= 1;
+        if (ok) { best = { back, sd, up }; break; }
+      }
+      this._lodgeCam = best || { back: -70, sd: 46, up: 30 };
+    }
+    const L = this._lodgeCam;
     const sway = Math.sin(t * 0.05) * 18;
-    const pos = new V3(b.x, b.y, b.z).addScaledVector(toPeak, -70).addScaledVector(side, 46 + sway).add(new V3(0, 14, 0));
+    const pos = new V3(b.x, b.y, b.z).addScaledVector(toPeak, L.back).addScaledVector(side, L.sd + sway).add(new V3(0, L.up, 0));
     const look = new V3(b.x, b.y, b.z).addScaledVector(toPeak, 260).add(new V3(0, 120, 0));
     return { pos, look, fov: 50 };
   },
@@ -7403,9 +7446,9 @@ const Game = {
       } else if (e.type === 'bump') { if (e.into > 2) Sound.bump(); }
       else if (e.type === 'brush') {
         // snow shaken off the branches falls around you
-        const t = e.tree, n = t.type ? 14 : 34;
+        const t = e.tree, n = t.type === 1 ? 14 : 34;
         for (let k = 0; k < n; k++) {
-          const a = Math.random() * TAU, r = Math.random() * (t.type ? 1.2 : 2.2) * t.s, h = t.y + (1.5 + Math.random() * 6) * t.s;
+          const a = Math.random() * TAU, r = Math.random() * (t.type === 1 ? 1.2 : 2.2) * t.s, h = t.y + (1.5 + Math.random() * 6) * t.s;
           const clump = Math.random() < 0.45;
           if (clump) FX.spawn(t.x + Math.cos(a) * r, h, t.z + Math.sin(a) * r, Player.vel.x * 0.1, -0.5 - Math.random(), Player.vel.z * 0.1, 2.5, 0.09 + Math.random() * 0.08, 0.07, 1, 1, 1, 1, 1, 0.4, 1, 1, 1);
           else FX.spawn(t.x + Math.cos(a) * r, h, t.z + Math.sin(a) * r, Player.vel.x * 0.1, -0.5 - Math.random(), Player.vel.z * 0.1, 1.6 + Math.random(), 0.25, 1.5, 0.5, 1, 1, 1, 0.5, 1.4);

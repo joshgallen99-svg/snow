@@ -207,12 +207,14 @@ const Scatter = {
         World.normal(px, pz, nrm);
         if (nrm.y < 0.72) continue; // too steep for trees
         const birchBias = sstep(400, 120, h) * 0.75 + 0.18 * noiseC(px / 120, pz / 120);
-        const type = r1 < birchBias ? 1 : 0;
+        let type = r1 < birchBias ? 1 : 0;
         const nearTreeline = sstep(430, 590, h);
+        // up near the treeline the wind plasters firs in rime until they're snow monsters (juhyo)
+        if (type === 0 && rnd() < sstep(470, 560, h) * 0.85) type = 2;
         const s = (type ? 0.85 + r2 * 0.5 : 0.75 + r2 * 0.75) * (1 - nearTreeline * 0.55);
         const t = { x: px, z: pz, y: h - 0.2, s, rot: r3 * TAU, type, tint: r2 };
         this.trees.push(t);
-        World.addCollider(px, pz, type ? 0.35 * s + 0.25 : 0.5 * s + 0.35, h + 8 * s, 'tree', t);
+        World.addCollider(px, pz, type === 1 ? 0.35 * s + 0.25 : type === 2 ? 0.9 * s + 0.4 : 0.5 * s + 0.35, h + 8 * s, 'tree', t);
       }
     }
   },

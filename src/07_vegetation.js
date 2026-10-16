@@ -23,6 +23,27 @@ const Vegetation = {
     });
     return b.build();
   },
+  // a fir buried in rime: lumpy white blobs leaning downwind, a little green showing through
+  monsterGeometry(lod) {
+    const b = new GeoBuilder({ smooth: true });
+    const rime = 0xeef3f8, blue = 0xdbe5ef, green = 0x2a4a35;
+    const rnd = mulberry32(lod ? 3 : 4);
+    if (lod === 1) {
+      b.add(G.ico(1, 1), { y: 3.4, sx: 1.9, sy: 3.6, sz: 1.8, color: rime });
+      return b.build();
+    }
+    const blobs = [[2.0, 1.1], [1.8, 2.3], [1.55, 3.4], [1.3, 4.4], [1.05, 5.3], [0.75, 6.1], [0.45, 6.7]];
+    blobs.forEach(([r, y], i) => {
+      const lean = i * 0.12;
+      for (let k = 0; k < 2; k++) {
+        const a = rnd() * TAU, o = r * 0.25;
+        b.add(G.ico(1, 1), { x: lean + Math.cos(a) * o, y, z: Math.sin(a) * o, sx: r, sy: r * 0.72, sz: r * 0.92, ry: rnd() * TAU, color: (i + k) % 3 ? rime : blue });
+      }
+      // needles peeking out on the sheltered side
+      if (i > 0 && i < 5) b.add(G.cone(r * 0.6, 0.7, 6), { x: lean - r * 0.75, y: y - 0.35, z: (rnd() - 0.5) * r, rz: 0.5, color: green });
+    });
+    return b.build();
+  },
   birchGeometry(lod) {
     const b = new GeoBuilder();
     const bark = 0xe9e5dc, mark = 0x3b3631, twig = 0x7d6c68;
@@ -180,19 +201,19 @@ const Vegetation = {
   init(scene) {
     this.group = new THREE.Group(); this.group.name = 'vegetation';
     scene.add(this.group);
-    const geoNear = [this.firGeometry(0), this.birchGeometry(0)];
-    const geoFar = [this.firGeometry(1), this.crossedPlanes(2, 0, 12.8, 6.4)];
+    const geoNear = [this.firGeometry(0), this.birchGeometry(0), this.monsterGeometry(0)];
+    const geoFar = [this.firGeometry(1), this.crossedPlanes(2, 0, 12.8, 6.4), this.monsterGeometry(1)];
     const matNear = this.lodMaterial(true), matFar = this.lodMaterial(false), depth = this.depthMaterial();
     const crownGeo = this.crossedPlanes(3, 0, 12.8, 6.4);
     const crownNear = this.crownMaterial(this.birchTexture(false), true);
     const crownFar = this.crownMaterial(this.birchTexture(true), false);
     const TS = 256, nt = Math.ceil((WORLD.half * 2) / TS);
     const buckets = new Map();
-    const byType = [[], []];
+    const byType = [[], [], []];
     for (const t of Scatter.trees) {
       byType[t.type].push(t);
       const key = Math.floor((t.x + WORLD.half) / TS) * 100 + Math.floor((t.z + WORLD.half) / TS);
-      let b = buckets.get(key); if (!b) buckets.set(key, (b = [[], []]));
+      let b = buckets.get(key); if (!b) buckets.set(key, (b = [[], [], []]));
       b[t.type].push(t);
     }
     const tint = new THREE.Color();
@@ -201,7 +222,7 @@ const Vegetation = {
         _m4.compose(_v.set(t.x, t.y, t.z), _q.setFromAxisAngle(_v2.set(0, 1, 0), t.rot), _s.set(t.s, t.s * (0.9 + t.tint * 0.25), t.s));
         mesh.setMatrixAt(i, _m4);
         const k = 0.86 + t.tint * 0.24;
-        mesh.setColorAt(i, tint.setRGB(k, k * (t.type ? 0.98 : 1.0), k));
+        mesh.setColorAt(i, t.type === 2 ? tint.setRGB(0.97 + t.tint * 0.03, 0.98, 1) : tint.setRGB(k, k * (t.type ? 0.98 : 1.0), k));
       });
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
@@ -210,7 +231,7 @@ const Vegetation = {
     for (const [key, b] of buckets) {
       const tx = Math.floor(key / 100), tz = key % 100;
       const tile = { cx: -WORLD.half + (tx + 0.5) * TS, cz: -WORLD.half + (tz + 0.5) * TS, meshes: [] };
-      for (let type = 0; type < 2; type++) {
+      for (let type = 0; type < 3; type++) {
         if (!b[type].length) continue;
         const m = new THREE.InstancedMesh(geoNear[type], matNear, b[type].length);
         setInst(m, b[type]);
@@ -226,8 +247,9 @@ const Vegetation = {
       }
       this.tiles.push(tile);
     }
-    for (let type = 0; type < 2; type++) {
-      const m = new THREE.InstancedMesh(geoFar[type], type ? crownFar.mat : matFar, byType[type].length);
+    for (let type = 0; type < 3; type++) {
+      if (!byType[type].length) continue;
+      const m = new THREE.InstancedMesh(geoFar[type], type === 1 ? crownFar.mat : matFar, byType[type].length);
       setInst(m, byType[type]);
       m.receiveShadow = false;
       this.group.add(m); this.far.push(m);

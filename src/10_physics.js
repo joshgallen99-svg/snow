@@ -606,7 +606,7 @@ const Player = {
       if (c.kind === 'rock') continue;
       // brushing through low fir branches knocks their snow loose
       if (c.kind === 'tree' && c.ref) {
-        const t = c.ref, canopy = t.s * (t.type ? 1.0 : 1.9) + R;
+        const t = c.ref, canopy = t.s * (t.type === 1 ? 1.0 : 1.9) + R;
         const dc = Math.hypot(p.x - c.x, p.z - c.z);
         if (dc < canopy && this.speed > 3 && this.time - (t.brushT || -9) > 1.6) {
           t.brushT = this.time;
