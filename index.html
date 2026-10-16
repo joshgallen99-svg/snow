@@ -5458,6 +5458,7 @@ const FX = {
     const C = this.aCol.array, M = this.aMisc.array;
     C[i * 3] = r; C[i * 3 + 1] = g; C[i * 3 + 2] = b;
     M[i * 3] = Math.random(); M[i * 3 + 1] = hard; M[i * 3 + 2] = lit;
+    this.spawned = true;
     this.grav[i] = grav; this.drag[i] = drag; this.flags[i] = flags;
     if (flags) this.floor[i] = this.snowTop(x, z) + (flags & 2 ? 0.25 : 0);
     return i;
@@ -5517,7 +5518,9 @@ const FX = {
       S[i] = lerp(this.size0[i], this.size1[i], 1 - (1 - t) * (1 - t));
       A[i] = this.alpha0[i] * Math.min(1, t * 14 + 0.15) * (1 - t * t);
     }
-    this.aPos.needsUpdate = true; this.aSize.needsUpdate = true; this.aAlpha.needsUpdate = true; this.aCol.needsUpdate = true; this.aMisc.needsUpdate = true;
+    this.aPos.needsUpdate = true; this.aSize.needsUpdate = true; this.aAlpha.needsUpdate = true;
+    // colour and per-particle constants only change when something spawns
+    if (this.spawned) { this.aCol.needsUpdate = true; this.aMisc.needsUpdate = true; this.spawned = false; }
   },
   // light the particles like the rest of the scene
   updateLight(cam) {
